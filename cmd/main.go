@@ -1,32 +1,31 @@
 package main
 
 import (
-	"log"
-	"net/http"
-	"os"
-
 	"lalan-be/internal/config"
 	"lalan-be/internal/handler"
 	"lalan-be/internal/repository"
 	"lalan-be/internal/route"
 	"lalan-be/internal/service"
+	"log"
+	"net/http"
+	"os"
 )
 
 func main() {
 	// config & DB
-	cfg, err := config.NewConfig()
+	cfg, err := config.DatabaseConfig()
 	if err != nil {
 		log.Fatal("Failed to connect DB:", err)
 	}
 	defer cfg.DB.Close()
 
 	// DI: repo → service → handler
-	hosterRepo := repository.NewHosterRepository(cfg.DB)
-	hosterService := service.NewHosterService(hosterRepo)
-	hosterHandler := handler.NewHosterHandler(hosterService)
+	authRepo := repository.NewAuthRepository(cfg.DB)
+	authService := service.NewAuthService(authRepo)
+	authHandler := handler.NewAuthHandler(authService)
 
 	// register route
-	route.RegisterHosterRoutes(hosterHandler)
+	route.AuthRoutes(authHandler)
 
 	// port
 	port := os.Getenv("APP_PORT")

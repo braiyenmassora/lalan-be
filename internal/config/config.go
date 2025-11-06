@@ -13,33 +13,32 @@ type Config struct {
 	DB *sqlx.DB
 }
 
-func NewConfig() (*Config, error) {
-	// load .env
-	_ = godotenv.Load(".env.dev")
-
-	dbHost := getEnv("DB_HOST", "localhost")
-	dbPort := getEnv("DB_PORT", "5432")
-	dbUser := getEnv("DB_USER", "postgres")
-	dbPassword := getEnv("DB_PASSWORD", "postgres")
-	dbName := getEnv("DB_NAME", "lalan")
-	sslMode := getEnv("DB_SSLMODE", "disable")
-
-	dsn := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		dbHost, dbPort, dbUser, dbPassword, dbName, sslMode,
-	)
-
-	db, err := sqlx.Connect("postgres", dsn)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Config{DB: db}, nil
-}
-
 func getEnv(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
 	return fallback
+}
+
+func DatabaseConfig() (*Config, error) {
+	// load .env
+	_ = godotenv.Load(".env.dev")
+
+	dsn := getEnv("DATABASE_URL", "")
+	if dsn == "" {
+		return nil, fmt.Errorf("DATABASE_URL is required")
+	}
+
+	db, err := sqlx.Connect("postgres", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	// Ping untuk verifikasi (opsional)
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	return &Config{DB: db}, nil
 }
