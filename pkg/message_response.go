@@ -30,4 +30,5 @@ const (
 
 	// category
 	MsgCategoryNameExist = "Category name already exist"
+	MsgCategoryNotFound  = "Category not found"
 )
