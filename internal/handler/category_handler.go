@@ -29,7 +29,7 @@ type CategoryRequest struct {
 func (h *CategoryHandler) AddCategory(w http.ResponseWriter, r *http.Request) {
 	// Validasi metode HTTP POST
 	if r.Method != http.MethodPost {
-		response.ErrorResponse(w, http.StatusMethodNotAllowed, "Message not allowed")
+		response.ErrorResponse(w, http.StatusMethodNotAllowed, message.MsgNotAllowed)
 		return
 	}
 	var req CategoryRequest
@@ -39,7 +39,7 @@ func (h *CategoryHandler) AddCategory(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	// Decode payload JSON
 	if err := decoder.Decode(&req); err != nil {
-		response.ErrorResponse(w, http.StatusBadRequest, "Invalid JSON")
+		response.ErrorResponse(w, http.StatusBadRequest, message.MsgBadRequest)
 		return
 	}
 

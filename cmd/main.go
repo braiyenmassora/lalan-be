@@ -31,6 +31,12 @@ func main() {
 	categoryHandler := handler.NewCategoryHandler(categoryService)
 	route.CategoryRoute(categoryHandler)
 
+	// item
+	ItemRepo := repository.NewItemRepository(cfg.DB)
+	itemService := service.NewItemRepository(ItemRepo)
+	itemHandler := handler.NewItemHandlerS(itemService)
+	route.ItemRoute(itemHandler)
+
 	// Konfigurasi port server
 	port := os.Getenv("APP_PORT")
 	if port == "" {

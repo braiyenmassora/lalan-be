@@ -9,7 +9,9 @@ Backend API for the Lalan Web Application – Admin Panel for Outdoor Hosters
 
 ## Getting Started
 
-### 1. Clone & Install Dependencies
+**Environment Variables**
+
+- `DATABASE_URL`: PostgreSQL connection string (required)
 
 ```bash
 # Clone the repository
@@ -18,33 +20,28 @@ cd lalan-be
 
 # Install dependencies
 go mod download
-```
 
-### 2. Configure Environment
-
-Copy the example environment file and configure your database settings:
-
-```bash
+# Configure environment
 cp .env.dev .env
+
 # Edit .env with your database credentials
+DATABASE_URL='postgres://<USERNAME>:<PASSWORD>@<HOST>:<PORT>/<DB_NAME>?sslmode=require&search_path={schema_name}'
 ```
 
-### 3. Environment Variables
+## Database Setup
 
-- `DATABASE_URL`: PostgreSQL connection string (required)
-- `APP_PORT`: Server port number (optional, default 8080)
-
-### 4. Setup Database
-
-Run the database migration:
+Run the database migrations to create the required tables:
 
 ```bash
-# Execute migration file
-psql -U your_user -d your_database -f migrations/create_hoster.sql
-psql -U your_user -d your_database -f migrations/create_categories.sql
+# Create hoster table
+psql -U <username> -d <database> -f migrations/create_hoster.sql
+# Create category table
+psql -U <username> -d <database> -f migrations/create_categories.sql
+# Create item table
+psql -U <username> -d <database> -f migrations/create_item.sql
 ```
 
-### 5. Install Air (Hot Reload Tool)
+### Install Air (Hot Reload Tool)
 
 Air provides automatic hot reload during development.
 
@@ -67,7 +64,7 @@ air -v
 ### Development Mode (with hot reload)
 
 ```bash
-air
+make dev
 ```
 
 ### Alternative Methods
@@ -112,3 +109,7 @@ lalan-be/
 ### Categories
 
 - POST /v1/category/add - Create a new category
+
+### Items
+
+- POST /v1/item/add - Create a new item
