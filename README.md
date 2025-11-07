@@ -11,8 +11,6 @@ Backend API for the Lalan Web Application – Admin Panel for Outdoor Hosters
 
 **Environment Variables**
 
-- `DATABASE_URL`: PostgreSQL connection string (required)
-
 ```bash
 # Clone the repository
 git clone https://github.com/ech0py/lalan-be.git
@@ -24,7 +22,7 @@ go mod download
 # Configure environment
 cp .env.dev .env
 
-# Edit .env with your database credentials
+# Edit .env with  database credentials
 DATABASE_URL='postgres://<USERNAME>:<PASSWORD>@<HOST>:<PORT>/<DB_NAME>?sslmode=require&search_path={schema_name}'
 ```
 
