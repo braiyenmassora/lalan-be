@@ -9,25 +9,26 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// kontrak untuk operasi database auth (CreateHoster, FindByEmail).
+// AuthRepository interface
 type AuthRepository interface {
-	CreateHoster(hoster *model.HosterModel) error
-	FindByEmail(email string) (*model.HosterModel, error)
-	FindByEmailForLogin(email string) (*model.HosterModel, error)
+	CreateHoster(hoster *model.HosterModel) error                 // Membuat hoster baru
+	FindByEmail(email string) (*model.HosterModel, error)         // Mencari hoster berdasarkan email
+	FindByEmailForLogin(email string) (*model.HosterModel, error) // Mencari hoster untuk login
 }
 
-// implementasi konkret pakai PostgreSQL (sqlx.DB)
+// authRepository struct
 type authRepository struct {
-	db *sqlx.DB
+	db *sqlx.DB // Koneksi database
 }
 
-// inisialisasi repository dengan koneksi DB
+// NewAuthRepository constructor
 func NewAuthRepository(db *sqlx.DB) AuthRepository {
 	return &authRepository{db: db}
 }
 
-// INSERT data hoster baru ke tabel hosters
+// CreateHoster method
 func (r *authRepository) CreateHoster(h *model.HosterModel) error {
+	// Insert data hoster
 	query := `
 		INSERT INTO hosters (
 			id, full_name, profile_photo, store_name, description, phone_number, email, address, password_hash
@@ -38,8 +39,9 @@ func (r *authRepository) CreateHoster(h *model.HosterModel) error {
 	return err
 }
 
-// cari hoster berdasarkan email; return nil kalau tidak ditemukan
+// FindByEmail method
 func (r *authRepository) FindByEmail(email string) (*model.HosterModel, error) {
+	// Cari hoster berdasarkan email
 	var hoster model.HosterModel
 	query := `SELECT * FROM hosters WHERE email = $1 LIMIT 1`
 
@@ -53,11 +55,11 @@ func (r *authRepository) FindByEmail(email string) (*model.HosterModel, error) {
 	return &hoster, nil
 }
 
-// cari hoster berdasarkan email
+// FindByEmailForLogin method
 func (r *authRepository) FindByEmailForLogin(email string) (*model.HosterModel, error) {
+	// Cari hoster untuk login
 	var h model.HosterModel
 
-	// Gunakan $1 → PostgreSQL
 	query := `
 		SELECT
 			id, email, password_hash, full_name, phone_number,
@@ -69,6 +71,7 @@ func (r *authRepository) FindByEmailForLogin(email string) (*model.HosterModel, 
 		LIMIT 1
 	`
 
+	// Scan hasil query
 	err := r.db.QueryRow(query, email).Scan(
 		&h.ID,
 		&h.Email,
@@ -87,7 +90,6 @@ func (r *authRepository) FindByEmailForLogin(email string) (*model.HosterModel, 
 		return nil, nil
 	}
 	if err != nil {
-		// Log untuk debug (hapus di prod)
 		log.Printf("Login query failed: %v | email: %s", err, email)
 		return nil, err
 	}

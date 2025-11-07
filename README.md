@@ -25,20 +25,26 @@ go mod download
 Copy the example environment file and configure your database settings:
 
 ```bash
-cp .env.local .env
+cp .env.dev .env
 # Edit .env with your database credentials
 ```
 
-### 3. Setup Database
+### 3. Environment Variables
+
+- `DATABASE_URL`: PostgreSQL connection string (required)
+- `APP_PORT`: Server port number (optional, default 8080)
+
+### 4. Setup Database
 
 Run the database migration:
 
 ```bash
 # Execute migration file
 psql -U your_user -d your_database -f migrations/create_hoster.sql
+psql -U your_user -d your_database -f migrations/create_categories.sql
 ```
 
-### 4. Install Air (Hot Reload Tool)
+### 5. Install Air (Hot Reload Tool)
 
 Air provides automatic hot reload during development.
 
@@ -56,26 +62,23 @@ source ~/.zshrc
 air -v
 ```
 
-## Running the Application
+## Run Locally
 
 ### Development Mode (with hot reload)
 
 ```bash
-make dev
+air
 ```
 
 ### Alternative Methods
 
 ```bash
-# Run with air directly
-air
-
 # Run without hot reload
 go run ./cmd/main.go
 
 # Build and run
-make build
-./tmp/main
+go build -o main ./cmd/main.go
+./main
 ```
 
 ## Project Structure
@@ -85,31 +88,27 @@ lalan-be/
 ├── cmd/
 │   └── main.go           # Application entry point
 ├── internal/
-│   ├── config/           # Configuration
-│   ├── handler/          # HTTP handlers
-│   ├── helper/           # Helper functions
+│   ├── config/           # Database configuration
+│   ├── handler/          # HTTP request handlers
 │   ├── model/            # Data models
-│   ├── repository/       # Database layer
+│   ├── repository/       # Database access layer
+│   ├── response/         # HTTP response utilities
 │   ├── route/            # Route definitions
-│   └── service/          # Business logic
-├── migrations/           # Database migrations
-├── pkg/                  # Public packages
-├── tmp/                  # Temporary build files
+│   └── service/          # Business logic layer
+├── migrations/           # Database schema migrations
+├── pkg/                  # Shared packages
 ├── .env.dev              # Development environment variables
-├── .air.toml             # Air configuration for hot reload
-└── Makefile              # Build and run commands
+├── go.mod                # Go module definition
+└── go.sum                # Go module checksums
 ```
 
-## Available Command
+## API Documentation
 
-```bash
-make dev          # Run development server with hot reload
-make build        # Build the application
-make run          # Run the application
-make clean        # Clean temporary files
-make install-air  # Install air tool
-```
+### Authentication
 
-## License
+- POST /v1/auth/register - Register a new hoster account
+- POST /v1/auth/login - Authenticate hoster login
 
-MIT
+### Categories
+
+- POST /v1/category/add - Create a new category

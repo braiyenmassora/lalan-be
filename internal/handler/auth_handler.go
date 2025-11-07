@@ -2,63 +2,54 @@ package handler
 
 import (
 	"encoding/json"
+	"lalan-be/internal/model"
+	"lalan-be/internal/response"
+	"lalan-be/internal/service"
+	"lalan-be/pkg/message"
 	"log"
 	"net/http"
-
-	"lalan-be/internal/model"
-	"lalan-be/internal/service"
-	"lalan-be/pkg"
 )
 
+// Struct untuk menangani request HTTP autentikasi
 type AuthHandler struct {
-	service service.AuthService
+	service service.AuthService // Service untuk operasi autentikasi
 }
 
+// Membuat instance AuthHandler baru dengan dependency injection
 func NewAuthHandler(s service.AuthService) *AuthHandler {
 	return &AuthHandler{service: s}
 }
 
-// helper untuk response error konsisten
-func sendErrorResponse(w http.ResponseWriter, code int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(pkg.Response{
-		Code:    code,
-		Status:  "error",
-		Message: message,
-		Data:    nil,
-	})
-}
-
-// RegisterRequest adalah struct untuk menerima data register dari client
+// Struct untuk payload request JSON register
 type RegisterRequest struct {
-	FullName     string `json:"full_name"`
-	ProfilePhoto string `json:"profile_photo"`
-	StoreName    string `json:"store_name"`
-	Description  string `json:"description"`
-	PhoneNumber  string `json:"phone_number"`
-	Email        string `json:"email"`
-	Address      string `json:"address"`
-	Password     string `json:"password"`
+	FullName     string `json:"full_name"`     // Nama lengkap hoster
+	ProfilePhoto string `json:"profile_photo"` // URL foto profil
+	StoreName    string `json:"store_name"`    // Nama toko
+	Description  string `json:"description"`   // Deskripsi toko
+	PhoneNumber  string `json:"phone_number"`  // Nomor telepon
+	Email        string `json:"email"`         // Alamat email
+	Address      string `json:"address"`       // Alamat
+	Password     string `json:"password"`      // Kata sandi
 }
 
-// Register: POST /v1/auth/register
+// Handler untuk registrasi hoster
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	// Validasi metode HTTP POST
 	if r.Method != http.MethodPost {
-		sendErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		response.ErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 	var req RegisterRequest
 	decoder := json.NewDecoder(r.Body)
-	// digunakan untuk mengunci agar user tidak menambhakan atau mengurangi payload
+	// Mencegah field tidak dikenal
 	decoder.DisallowUnknownFields()
-
+	// Decode payload JSON
 	if err := decoder.Decode(&req); err != nil {
-		sendErrorResponse(w, http.StatusBadRequest, "Invalid JSON")
+		response.ErrorResponse(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
-	// Convert ke model
+	// Konversi request ke model domain
 	input := &model.HosterModel{
 		FullName:     req.FullName,
 		ProfilePhoto: req.ProfilePhoto,
@@ -67,44 +58,51 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		PhoneNumber:  req.PhoneNumber,
 		Email:        req.Email,
 		Address:      req.Address,
-		PasswordHash: req.Password, // akan di-hash di service
+		PasswordHash: req.Password,
 	}
 
+	// Panggil service untuk registrasi
 	if err := h.service.Register(input); err != nil {
-		sendErrorResponse(w, http.StatusBadRequest, err.Error())
+		response.ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(pkg.Response{
+	// Kembalikan response JSON
+	json.NewEncoder(w).Encode(response.Response{
 		Code:    http.StatusCreated,
 		Status:  "success",
-		Message: "Hoster registered successfully",
+		Message: message.MsgHosterCreatedSuccess,
 		Data:    nil,
 	})
 }
 
-// Login: POST /v1/auth/login
+// Handler untuk login hoster
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	// Validasi metode HTTP POST
 	if r.Method != http.MethodPost {
-		sendErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		response.ErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 	var req struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
+	// Decode payload JSON
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendErrorResponse(w, http.StatusBadRequest, "Invalid JSON")
+		response.ErrorResponse(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
+	// Log request untuk debugging
 	log.Printf("Login request: email=%s", req.Email)
 
+	// Panggil service untuk login
 	resp, err := h.service.Login(req.Email, req.Password)
 	if err != nil {
-		sendErrorResponse(w, http.StatusUnauthorized, err.Error())
+		response.ErrorResponse(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	// Kembalikan response JSON
 	json.NewEncoder(w).Encode(resp)
 }

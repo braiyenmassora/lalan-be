@@ -17,12 +17,16 @@ go.work
 # Dependency directories
 vendor/
 
-# Environment variables (exclude .env but allow .env.local as example)
+# Environment variables
 .env
+.env.dev
+*.env
 
-# Temporary files
+# Temporary files and directories
 tmp/
 *.tmp
+
+# Log files
 *.log
 build-errors.log
 
@@ -36,12 +40,3 @@ build-errors.log
 # OS specific
 .DS_Store
 Thumbs.db
-
-# Air tmp directory
-tmp/
-.env.dev
-.env
-*.env
-.env.dev
-.env
-*.env
