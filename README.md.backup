@@ -1,0 +1,826 @@
+# Lalan BE
+
+Backend API for the Lalan Web Application – Admin Panel for Outdoor Hosters
+
+## Requirements
+
+- **Go** 1.24.4 or higher
+- **PostgreSQL**
+
+## Getting Started
+
+**Environment Variables**
+
+```bash
+# Clone the repository
+git clone https://github.com/ech0py/lalan-be.git
+cd lalan-be
+
+# Install dependencies
+go mod download
+
+# Configure environment
+cp .env.dev .env
+
+# Edit .env with  database credentials
+DATABASE_URL='postgres://<USERNAME>:<PASSWORD>@<HOST>:<PORT>/<DB_NAME>?sslmode=require&search_path={schema_name}'
+```
+
+## Database Setup
+
+Run the database migrations to create the required tables:
+
+```bash
+# Create hoster table
+psql -U <username> -d <database> -f migrations/create_hoster.sql
+# Create category table
+psql -U <username> -d <database> -f migrations/create_categories.sql
+# Create item table
+psql -U <username> -d <database> -f migrations/create_item.sql
+```
+
+### Install Air (Hot Reload Tool)
+
+Air provides automatic hot reload during development.
+
+**Linux/Mac:**
+
+```bash
+# Install air
+go install github.com/air-verse/air@latest
+
+# Add Go bin to PATH (if not already added)
+echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> ~/.zshrc
+source ~/.zshrc
+
+# Verify installation
+air -v
+```
+
+## Run Locally
+
+### Development Mode (with hot reload)
+
+```bash
+make dev
+```
+
+### Alternative Methods
+
+```bash
+# Run without hot reload
+go run ./cmd/main.go
+
+# Build and run
+go build -o main ./cmd/main.go
+./main
+```
+
+## Project Structure
+
+```
+lalan-be/
+├── cmd/
+│   └── main.go           # Application entry point
+├── internal/
+│   ├── config/           # Database configuration
+│   ├── handler/          # HTTP request handlers
+│   ├── middleware/       # JWT authentication middleware
+│   ├── model/            # Data models
+│   ├── repository/       # Database access layer
+│   ├── response/         # HTTP response utilities
+│   ├── route/            # Route definitions
+│   └── service/          # Business logic layer
+├── migrations/           # Database schema migrations
+├── pkg/                  # Shared packages
+├── .env.dev              # Development environment variables
+├── go.mod                # Go module definition
+└── go.sum                # Go module checksums
+```
+
+## API Documentation
+
+Base URL: `http://localhost:8080`
+
+### 🔐 Authentication Flow
+
+Sebelum menggunakan endpoint yang membutuhkan autentikasi (🔒), Anda harus login terlebih dahulu dan menggunakan token yang didapat.
+
+#### **Step 1: Register** (Opsional jika belum punya akun)
+
+```http
+POST /v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "securepassword123"
+}
+```
+
+**Response:**
+
+```json
+{
+  "code": 201,
+  "data": {
+    "id": "be50f9e2-3a90-4611-9f5d-9328277caead"
+  },
+  "message": "Hoster created successfully.",
+  "success": true
+}
+```
+
+#### **Step 2: Login**
+
+```http
+POST /v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "securepassword123"
+}
+```
+
+**Response:**
+
+```json
+{
+  "code": 200,
+  "data": {
+    "id": "be50f9e2-3a90-4611-9f5d-9328277caead",
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refresh_token": "272556b3-32ee-4ca8-9500-1a9a77ee3266",
+    "token_type": "Bearer",
+    "expires_in": 3600
+  },
+  "message": "Hoster logged in successfully.",
+  "success": true
+}
+```
+
+#### **Step 3: Gunakan Token untuk Request Berikutnya**
+
+Untuk endpoint yang membutuhkan autentikasi (🔒), tambahkan header:
+
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Cara Setting di Postman:**
+
+1. Buka tab **Authorization**
+2. Pilih Type: **Bearer Token**
+3. Paste `access_token` yang didapat dari login ke field **Token**
+4. Semua request selanjutnya akan otomatis menggunakan token ini
+
+---
+
+### 📋 Categories API
+
+#### **List All Categories** 🔓 (Public)
+
+```http
+GET /v1/category/list
+```
+
+#### **Get Category Detail** 🔓 (Public)
+
+```http
+GET /v1/category/detail?id={category_id}
+```
+
+#### **Create Category** 🔒 (Requires Login)
+
+```http
+POST /v1/category/add
+Authorization: Bearer {your_token}
+Content-Type: application/json
+
+{
+  "name": "Camping Gear",
+  "description": "All camping equipment and gear"
+}
+```
+
+#### **Update Category** 🔒 (Requires Login)
+
+```http
+PUT /v1/category/update?id={category_id}
+Authorization: Bearer {your_token}
+Content-Type: application/json
+
+{
+  "name": "Outdoor Camping Gear",
+  "description": "Updated description"
+}
+```
+
+#### **Delete Category** 🔒 (Requires Login)
+
+```http
+DELETE /v1/category/delete?id={category_id}
+Authorization: Bearer {your_token}
+```
+
+---
+
+### 🎒 Items API
+
+#### **List All Items** 🔓 (Public)
+
+```http
+GET /v1/item/list
+```
+
+#### **Get Item Detail** 🔓 (Public)
+
+```http
+GET /v1/item/detail?id={item_id}
+```
+
+#### **Get My Items** 🔒 (Requires Login)
+
+Mendapatkan semua item milik user yang sedang login.
+
+```http
+GET /v1/item/my-items
+Authorization: Bearer {your_token}
+```
+
+#### **Create Item** 🔒 (Requires Login)
+
+UserID akan otomatis diambil dari token JWT.
+
+```http
+POST /v1/item/add
+Authorization: Bearer {your_token}
+Content-Type: application/json
+
+{
+  "name": "Tent 4 Person",
+  "description": "Spacious tent for 4 people",
+  "photos": ["https://example.com/photo1.jpg", "https://example.com/photo2.jpg"],
+  "stock": 5,
+  "pickup_type": "delivery",
+  "price_per_day": 100000,
+  "deposit": 500000,
+  "discount": 10,
+  "category_id": "uuid-category-id"
+}
+```
+
+**Notes:**
+
+- `pickup_type` harus `"pickup"` atau `"delivery"`
+- `photos` adalah array of strings (URL gambar)
+- `user_id` otomatis diambil dari token, tidak perlu dikirim
+
+#### **Update Item** 🔒 (Requires Login + Owner Only)
+
+Hanya owner item yang bisa update.
+
+```http
+PUT /v1/item/update?id={item_id}
+Authorization: Bearer {your_token}
+Content-Type: application/json
+
+{
+  "name": "Tent 4 Person - Updated",
+  "description": "Updated description",
+  "photos": ["https://example.com/new-photo.jpg"],
+  "stock": 3,
+  "pickup_type": "pickup",
+  "price_per_day": 120000,
+  "deposit": 500000,
+  "discount": 15,
+  "category_id": "uuid-category-id"
+}
+```
+
+#### **Delete Item** 🔒 (Requires Login + Owner Only)
+
+Hanya owner item yang bisa delete.
+
+```http
+DELETE /v1/item/delete?id={item_id}
+Authorization: Bearer {your_token}
+```
+
+---
+
+### 🔑 Protected Routes Summary
+
+**Legend:**
+
+- 🔓 = Public (tidak perlu login)
+- 🔒 = Protected (wajib login dan kirim Bearer token)
+
+| Endpoint | Method | Auth Required | Description |
+|----------|--------|---------------|-------------|
+| `/v1/auth/register` | POST | 🔓 | Register akun baru |
+| `/v1/auth/login` | POST | 🔓 | Login dan dapat token |
+| `/v1/category/list` | GET | 🔓 | List semua kategori |
+| `/v1/category/detail` | GET | 🔓 | Detail kategori |
+| `/v1/category/add` | POST | 🔒 | Tambah kategori |
+| `/v1/category/update` | PUT | 🔒 | Update kategori |
+| `/v1/category/delete` | DELETE | 🔒 | Hapus kategori |
+| `/v1/item/list` | GET | 🔓 | List semua item |
+| `/v1/item/detail` | GET | 🔓 | Detail item |
+| `/v1/item/my-items` | GET | 🔒 | Item milik saya |
+| `/v1/item/add` | POST | 🔒 | Tambah item |
+| `/v1/item/update` | PUT | 🔒 | Update item (owner only) |
+| `/v1/item/delete` | DELETE | 🔒 | Hapus item (owner only) |
+
+---
+
+### ⚠️ Error Responses
+
+**Unauthorized (401):**
+
+```json
+{
+  "code": 401,
+  "message": "Unauthorized access.",
+  "success": false
+}
+```
+
+**Bad Request (400):**
+
+```json
+{
+  "code": 400,
+  "message": "Item name is required",
+  "success": false
+}
+```
+
+**Not Found (404):**
+
+```json
+{
+  "code": 404,
+  "message": "Item not found.",
+  "success": false
+}
+```
+
+---
+
+## 🧪 Testing with Postman
+
+### Setup Collection
+
+1. **Create Environment** (Opsional tapi recommended)
+   - Variable: `base_url` = `http://localhost:8080`
+   - Variable: `token` = (akan di-set otomatis setelah login)
+
+2. **Login Request**
+   - Method: POST
+   - URL: `{{base_url}}/v1/auth/login`
+   - Body: raw JSON
+   - Tambahkan di tab **Tests**:
+
+     ```javascript
+     pm.environment.set("token", pm.response.json().data.access_token);
+     ```
+
+3. **Protected Requests**
+   - Di tab **Authorization**, pilih **Bearer Token**
+   - Token: `{{token}}`
+
+### Example Test Flow
+
+1. **Register** → Buat akun baru
+2. **Login** → Dapat token (auto save ke environment)
+3. **Create Category** → Gunakan token dari login
+4. **List Categories** → Lihat kategori yang baru dibuat
+5. **Create Item** → Buat item dengan category_id yang valid
+6. **Get My Items** → Lihat item yang baru dibuat
+7. **Update Item** → Edit item milik sendiri
+8. **Delete Item** → Hapus item milik sendiri
+
+---
+
+## 🛡️ Security Features
+
+- ✅ **JWT Authentication** - Token-based authentication
+- ✅ **Password Hashing** - Bcrypt untuk keamanan password
+- ✅ **Ownership Validation** - User hanya bisa edit/delete item miliknya
+- ✅ **SQL Injection Protection** - Parameterized queries
+- ✅ **Input Validation** - Validasi di service layer
+
+---
+
+## 📝 Development Notes
+
+- Token expires dalam **1 jam** (3600 detik)
+- Gunakan `refresh_token` untuk mendapatkan token baru (fitur coming soon)
+- Database menggunakan UUID untuk primary keys
+- Timestamps (`created_at`, `updated_at`) otomatis di-handle oleh database
+
+---
+
+## 🚀 Panduan Menambah atau Edit Fitur
+
+Aplikasi ini menggunakan **Clean Architecture** dengan layer terpisah. Ikuti urutan berikut untuk menambah fitur baru:
+
+### 📋 Checklist: Menambah Fitur Baru (Contoh: "Bookings")
+
+#### **1. Database Migration** 📊
+Buat file SQL untuk schema database:
+
+```bash
+# Buat file migration
+touch migrations/create_bookings.sql
+```
+
+```sql
+-- migrations/create_bookings.sql
+CREATE TABLE bookings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id UUID NOT NULL REFERENCES items(id),
+    user_id UUID NOT NULL REFERENCES hoster(id),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    total_price INT NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_bookings_user_id ON bookings(user_id);
+CREATE INDEX idx_bookings_item_id ON bookings(item_id);
+```
+
+Jalankan migration:
+```bash
+psql -U <username> -d <database> -f migrations/create_bookings.sql
+```
+
+#### **2. Model** 📦
+Buat struct untuk data entity di `internal/model/`:
+
+```bash
+touch internal/model/booking_model.go
+```
+
+```go
+// internal/model/booking_model.go
+package model
+
+import "time"
+
+type BookingModel struct {
+    ID         string    `json:"id" db:"id"`
+    ItemID     string    `json:"item_id" db:"item_id"`
+    UserID     string    `json:"user_id" db:"user_id"`
+    StartDate  time.Time `json:"start_date" db:"start_date"`
+    EndDate    time.Time `json:"end_date" db:"end_date"`
+    TotalPrice int       `json:"total_price" db:"total_price"`
+    Status     string    `json:"status" db:"status"`
+    CreatedAt  time.Time `json:"created_at" db:"created_at"`
+    UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
+}
+```
+
+#### **3. Repository** 🗄️
+Buat interface dan implementasi untuk akses database di `internal/repository/`:
+
+```bash
+touch internal/repository/booking_repository.go
+```
+
+```go
+// internal/repository/booking_repository.go
+package repository
+
+import (
+    "lalan-be/internal/model"
+    "github.com/jmoiron/sqlx"
+)
+
+// Interface: definisikan method yang dibutuhkan
+type BookingRepository interface {
+    Create(booking *model.BookingModel) error
+    FindByID(id string) (*model.BookingModel, error)
+    FindByUserID(userID string) ([]*model.BookingModel, error)
+    Update(booking *model.BookingModel) error
+    Delete(id string) error
+}
+
+// Implementasi
+type bookingRepository struct {
+    db *sqlx.DB
+}
+
+func NewBookingRepository(db *sqlx.DB) BookingRepository {
+    return &bookingRepository{db: db}
+}
+
+func (r *bookingRepository) Create(booking *model.BookingModel) error {
+    query := `INSERT INTO bookings (...) VALUES (...)`
+    _, err := r.db.Exec(query, ...)
+    return err
+}
+
+// ... implementasi method lainnya
+```
+
+#### **4. Service** 💼
+Buat business logic di `internal/service/`:
+
+```bash
+touch internal/service/booking_service.go
+```
+
+```go
+// internal/service/booking_service.go
+package service
+
+import (
+    "lalan-be/internal/model"
+    "lalan-be/internal/repository"
+    "github.com/google/uuid"
+)
+
+// Interface: definisikan operasi bisnis
+type BookingService interface {
+    CreateBooking(input *model.BookingModel) (*model.BookingModel, error)
+    GetBookingByID(id string) (*model.BookingModel, error)
+    GetUserBookings(userID string) ([]*model.BookingModel, error)
+    UpdateBooking(id string, userID string, input *model.BookingModel) (*model.BookingModel, error)
+    CancelBooking(id string, userID string) error
+}
+
+// Implementasi
+type bookingService struct {
+    repo repository.BookingRepository
+}
+
+func NewBookingService(repo repository.BookingRepository) BookingService {
+    return &bookingService{repo: repo}
+}
+
+func (s *bookingService) CreateBooking(input *model.BookingModel) (*model.BookingModel, error) {
+    // Validasi input
+    if input.ItemID == "" {
+        return nil, errors.New("item ID is required")
+    }
+    
+    // Business logic: cek ketersediaan, hitung harga, dll
+    
+    // Generate ID
+    input.ID = uuid.New().String()
+    
+    // Simpan ke database
+    if err := s.repo.Create(input); err != nil {
+        return nil, err
+    }
+    
+    return s.repo.FindByID(input.ID)
+}
+
+// ... implementasi method lainnya
+```
+
+#### **5. Handler** 🎯
+Buat HTTP handler di `internal/handler/`:
+
+```bash
+touch internal/handler/booking_handler.go
+```
+
+```go
+// internal/handler/booking_handler.go
+package handler
+
+import (
+    "encoding/json"
+    "lalan-be/internal/middleware"
+    "lalan-be/internal/model"
+    "lalan-be/internal/response"
+    "lalan-be/internal/service"
+    "net/http"
+)
+
+type BookingHandler struct {
+    service service.BookingService
+}
+
+func NewBookingHandler(s service.BookingService) *BookingHandler {
+    return &BookingHandler{service: s}
+}
+
+type BookingRequest struct {
+    ItemID    string `json:"item_id"`
+    StartDate string `json:"start_date"`
+    EndDate   string `json:"end_date"`
+}
+
+func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
+    if r.Method != http.MethodPost {
+        response.BadRequest(w, "Method not allowed")
+        return
+    }
+    
+    // Ambil user ID dari JWT
+    userID := middleware.GetUserID(r)
+    if userID == "" {
+        response.Unauthorized(w, "Unauthorized")
+        return
+    }
+    
+    // Decode request
+    var req BookingRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        response.BadRequest(w, "Invalid request")
+        return
+    }
+    
+    // Panggil service
+    booking, err := h.service.CreateBooking(...)
+    if err != nil {
+        response.BadRequest(w, err.Error())
+        return
+    }
+    
+    response.Created(w, booking, "Booking created successfully")
+}
+
+// ... handler lainnya: GetBooking, GetMyBookings, UpdateBooking, CancelBooking
+```
+
+#### **6. Routes** 🛣️
+Buat routing di `internal/route/`:
+
+```bash
+touch internal/route/booking_route.go
+```
+
+```go
+// internal/route/booking_route.go
+package route
+
+import (
+    "lalan-be/internal/handler"
+    "lalan-be/internal/middleware"
+    "net/http"
+)
+
+func BookingRoutes(h *handler.BookingHandler) {
+    v1 := "/v1/booking"
+    
+    // Protected routes (perlu login)
+    createHandler := middleware.JWTMiddleware(http.HandlerFunc(h.CreateBooking))
+    myBookingsHandler := middleware.JWTMiddleware(http.HandlerFunc(h.GetMyBookings))
+    updateHandler := middleware.JWTMiddleware(http.HandlerFunc(h.UpdateBooking))
+    cancelHandler := middleware.JWTMiddleware(http.HandlerFunc(h.CancelBooking))
+    
+    http.Handle(v1+"/create", createHandler)
+    http.Handle(v1+"/my-bookings", myBookingsHandler)
+    http.Handle(v1+"/update", updateHandler)
+    http.Handle(v1+"/cancel", cancelHandler)
+    
+    // Public routes
+    http.HandleFunc(v1+"/detail", h.GetBooking)
+}
+```
+
+#### **7. Register di Main** 🔗
+Daftarkan di `cmd/main.go`:
+
+```go
+// cmd/main.go
+func main() {
+    // ... existing code ...
+    
+    // Inisialisasi komponen booking
+    bookingRepo := repository.NewBookingRepository(cfg.DB)
+    bookingService := service.NewBookingService(bookingRepo)
+    bookingHandler := handler.NewBookingHandler(bookingService)
+    route.BookingRoutes(bookingHandler)
+    
+    // ... rest of code ...
+}
+```
+
+---
+
+### 🔧 Menambah Method Baru ke Fitur Existing
+
+Jika ingin menambah method baru ke fitur yang sudah ada (misal: Search Items):
+
+1. **Update Interface di Repository**
+   ```go
+   // internal/repository/item_repository.go
+   type ItemRepository interface {
+       // ... existing methods ...
+       SearchItems(keyword string) ([]*model.ItemModel, error) // NEW
+   }
+   ```
+
+2. **Implementasi di Repository**
+   ```go
+   func (r *itemRepository) SearchItems(keyword string) ([]*model.ItemModel, error) {
+       query := `SELECT * FROM items WHERE name ILIKE $1 OR description ILIKE $1`
+       // ... implementation
+   }
+   ```
+
+3. **Update Interface di Service**
+   ```go
+   type ItemService interface {
+       // ... existing methods ...
+       SearchItems(keyword string) ([]*model.ItemModel, error) // NEW
+   }
+   ```
+
+4. **Implementasi di Service**
+   ```go
+   func (s *itemService) SearchItems(keyword string) ([]*model.ItemModel, error) {
+       if keyword == "" {
+           return nil, errors.New("keyword is required")
+       }
+       return s.repo.SearchItems("%" + keyword + "%")
+   }
+   ```
+
+5. **Tambah Handler**
+   ```go
+   func (h *ItemHandler) SearchItems(w http.ResponseWriter, r *http.Request) {
+       keyword := r.URL.Query().Get("q")
+       items, err := h.service.SearchItems(keyword)
+       // ... response
+   }
+   ```
+
+6. **Tambah Route**
+   ```go
+   http.HandleFunc(v1+"/search", h.SearchItems)
+   ```
+
+---
+
+### 📐 Best Practices
+
+#### ✅ DO:
+- Selalu validasi input di **service layer**
+- Gunakan **interface** untuk dependency injection
+- Handle error dengan jelas di setiap layer
+- Gunakan **parameterized queries** untuk SQL
+- Tambahkan **JWT middleware** untuk endpoint yang perlu autentikasi
+- Gunakan **meaningful names** untuk function dan variable
+- Tambahkan **logging** untuk debugging
+- Update **README.md** dengan API documentation
+
+#### ❌ DON'T:
+- Jangan masukkan business logic di handler
+- Jangan akses database langsung dari handler
+- Jangan hardcode values, gunakan constants
+- Jangan expose internal errors ke user
+- Jangan lupa validasi ownership untuk edit/delete
+- Jangan skip error handling
+
+---
+
+### 🔄 Flow Diagram
+
+```
+HTTP Request
+    ↓
+[Route] → Check JWT Middleware (jika protected)
+    ↓
+[Handler] → Parse request, extract user ID
+    ↓
+[Service] → Validate input, business logic
+    ↓
+[Repository] → Database operations
+    ↓
+[Service] ← Return data
+    ↓
+[Handler] ← Format response
+    ↓
+HTTP Response (JSON)
+```
+
+---
+
+### 📚 Referensi Cepat
+
+**File yang perlu diubah untuk fitur baru:**
+1. `migrations/*.sql` - Database schema
+2. `internal/model/*_model.go` - Data structure
+3. `internal/repository/*_repository.go` - Database access
+4. `internal/service/*_service.go` - Business logic
+5. `internal/handler/*_handler.go` - HTTP handlers
+6. `internal/route/*_route.go` - URL routing
+7. `cmd/main.go` - Register components
+8. `pkg/message/message.go` - Error messages (opsional)
+9. `README.md` - API documentation
+
+**Contoh Lengkap yang Bisa Dijadikan Template:**
+- Category module: Fitur sederhana tanpa relasi kompleks
+- Item module: Fitur dengan foreign key, ownership, dan array field

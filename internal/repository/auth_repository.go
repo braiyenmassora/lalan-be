@@ -9,24 +9,26 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// AuthRepository interface
+// Paket repository untuk akses data database.
+
+// Interface untuk operasi autentikasi hoster.
 type AuthRepository interface {
-	CreateHoster(hoster *model.HosterModel) error                 // Membuat hoster baru
-	FindByEmail(email string) (*model.HosterModel, error)         // Mencari hoster berdasarkan email
-	FindByEmailForLogin(email string) (*model.HosterModel, error) // Mencari hoster untuk login
+	CreateHoster(hoster *model.HosterModel) error                 // Simpan hoster baru
+	FindByEmail(email string) (*model.HosterModel, error)         // Cari hoster berdasarkan email
+	FindByEmailForLogin(email string) (*model.HosterModel, error) // Cari hoster untuk login
 }
 
-// authRepository struct
+// Struktur implementasi repository autentikasi.
 type authRepository struct {
 	db *sqlx.DB // Koneksi database
 }
 
-// NewAuthRepository constructor
+// Buat instance repository autentikasi dengan koneksi database.
 func NewAuthRepository(db *sqlx.DB) AuthRepository {
 	return &authRepository{db: db}
 }
 
-// CreateHoster method
+// Simpan hoster baru ke database.
 func (r *authRepository) CreateHoster(h *model.HosterModel) error {
 	// Insert data hoster
 	query := `
@@ -39,7 +41,7 @@ func (r *authRepository) CreateHoster(h *model.HosterModel) error {
 	return err
 }
 
-// FindByEmail method
+// Cari hoster berdasarkan email.
 func (r *authRepository) FindByEmail(email string) (*model.HosterModel, error) {
 	// Cari hoster berdasarkan email
 	var hoster model.HosterModel
@@ -55,7 +57,7 @@ func (r *authRepository) FindByEmail(email string) (*model.HosterModel, error) {
 	return &hoster, nil
 }
 
-// FindByEmailForLogin method
+// Cari hoster untuk proses login dengan field tertentu.
 func (r *authRepository) FindByEmailForLogin(email string) (*model.HosterModel, error) {
 	// Cari hoster untuk login
 	var h model.HosterModel

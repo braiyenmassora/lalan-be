@@ -1,55 +1,53 @@
+// internal/handler/auth_handler.go
 package handler
 
 import (
 	"encoding/json"
+	"lalan-be/internal/middleware"
 	"lalan-be/internal/model"
 	"lalan-be/internal/response"
 	"lalan-be/internal/service"
 	"lalan-be/pkg/message"
-	"log"
 	"net/http"
 )
 
-// Struct untuk menangani request HTTP autentikasi
+// Paket handler untuk handle request HTTP autentikasi.
+
+// Struktur handler autentikasi dengan dependency service.
 type AuthHandler struct {
-	service service.AuthService // Service untuk operasi autentikasi
+	service service.AuthService
 }
 
-// Membuat instance AuthHandler baru dengan dependency injection
+// Buat instance handler autentikasi dengan service.
 func NewAuthHandler(s service.AuthService) *AuthHandler {
 	return &AuthHandler{service: s}
 }
 
-// Struct untuk payload request JSON register
+// Struktur request untuk registrasi hoster.
 type RegisterRequest struct {
-	FullName     string `json:"full_name"`     // Nama lengkap hoster
-	ProfilePhoto string `json:"profile_photo"` // URL foto profil
-	StoreName    string `json:"store_name"`    // Nama toko
-	Description  string `json:"description"`   // Deskripsi toko
-	PhoneNumber  string `json:"phone_number"`  // Nomor telepon
-	Email        string `json:"email"`         // Alamat email
-	Address      string `json:"address"`       // Alamat
-	Password     string `json:"password"`      // Kata sandi
+	FullName     string `json:"full_name"`
+	ProfilePhoto string `json:"profile_photo"`
+	StoreName    string `json:"store_name"`
+	Description  string `json:"description"`
+	PhoneNumber  string `json:"phone_number"`
+	Email        string `json:"email"`
+	Address      string `json:"address"`
+	Password     string `json:"password"`
 }
 
-// Handler untuk registrasi hoster
+// Handle registrasi hoster dan kembalikan token.
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	// Validasi metode HTTP POST
 	if r.Method != http.MethodPost {
-		response.ErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
-	var req RegisterRequest
-	decoder := json.NewDecoder(r.Body)
-	// Mencegah field tidak dikenal
-	decoder.DisallowUnknownFields()
-	// Decode payload JSON
-	if err := decoder.Decode(&req); err != nil {
-		response.ErrorResponse(w, http.StatusBadRequest, "Invalid JSON")
+		response.BadRequest(w, message.MsgNotAllowed)
 		return
 	}
 
-	// Konversi request ke model domain
+	var req RegisterRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.BadRequest(w, message.MsgNotAllowed)
+		return
+	}
+
 	input := &model.HosterModel{
 		FullName:     req.FullName,
 		ProfilePhoto: req.ProfilePhoto,
@@ -61,48 +59,51 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		PasswordHash: req.Password,
 	}
 
-	// Panggil service untuk registrasi
-	if err := h.service.Register(input); err != nil {
-		response.ErrorResponse(w, http.StatusBadRequest, err.Error())
+	authResp, err := h.service.Register(input)
+	if err != nil {
+		response.BadRequest(w, err.Error())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	// Kembalikan response JSON
-	json.NewEncoder(w).Encode(response.Response{
-		Code:    http.StatusCreated,
-		Status:  "success",
-		Message: message.MsgHosterCreatedSuccess,
-		Data:    nil,
-	})
+
+	response.Created(w, authResp, message.MsgHosterCreatedSuccess)
 }
 
-// Handler untuk login hoster
+// Handle login hoster dan kembalikan token.
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	// Validasi metode HTTP POST
 	if r.Method != http.MethodPost {
-		response.ErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		response.BadRequest(w, "Method not allowed")
 		return
 	}
+
 	var req struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
-	// Decode payload JSON
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.ErrorResponse(w, http.StatusBadRequest, "Invalid JSON")
+		response.BadRequest(w, "Invalid JSON")
 		return
 	}
 
-	// Log request untuk debugging
-	log.Printf("Login request: email=%s", req.Email)
-
-	// Panggil service untuk login
-	resp, err := h.service.Login(req.Email, req.Password)
+	authResp, err := h.service.Login(req.Email, req.Password)
 	if err != nil {
-		response.ErrorResponse(w, http.StatusUnauthorized, err.Error())
+		response.Unauthorized(w, err.Error())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	// Kembalikan response JSON
-	json.NewEncoder(w).Encode(resp)
+
+	response.OK(w, authResp, "Hoster logged in successfully.")
+}
+
+// Handle test endpoint terproteksi dengan JWT.
+func (h *AuthHandler) TestProtected(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r)
+	if userID == "" {
+		response.Unauthorized(w, "Token gagal diverifikasi")
+		return
+	}
+
+	response.OK(w, map[string]string{
+		"message": "Token VALID! Kamu login sebagai:",
+		"user_id": userID,
+	}, "Middleware JWT berhasil!")
 }

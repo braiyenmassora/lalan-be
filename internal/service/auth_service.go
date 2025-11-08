@@ -2,87 +2,103 @@ package service
 
 import (
 	"errors"
+	"lalan-be/internal/config"
 	"lalan-be/internal/model"
 	"lalan-be/internal/repository"
-	"lalan-be/internal/response"
 	"lalan-be/pkg/message"
-	"log"
-	"net/http"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// AuthService adalah interface untuk layanan autentikasi
+// Paket service untuk handle logika bisnis autentikasi.
+
+// Struktur respons autentikasi untuk API.
+type AuthResponse struct {
+	ID           string `json:"id"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int    `json:"expires_in"`
+}
+
+// Interface untuk layanan autentikasi.
 type AuthService interface {
-	Register(input *model.HosterModel) error                  // Mendaftarkan hoster baru
-	Login(email, password string) (*response.Response, error) // Masuk dengan email dan password
+	Register(input *model.HosterModel) (*AuthResponse, error)
+	Login(email, password string) (*AuthResponse, error)
 }
 
-// authService adalah struct yang mengimplementasikan AuthService
+// Struktur implementasi layanan autentikasi.
 type authService struct {
-	repo repository.AuthRepository // Repository untuk operasi autentikasi
+	repo repository.AuthRepository
 }
 
-// NewAuthService membuat instance baru dari authService
+// Buat instance baru layanan autentikasi dengan dependency injection.
 func NewAuthService(repo repository.AuthRepository) AuthService {
 	return &authService{repo: repo}
 }
 
-// Register mendaftarkan hoster baru
-func (s *authService) Register(input *model.HosterModel) error {
-	// Memeriksa apakah email sudah terdaftar
-	existing, err := s.repo.FindByEmail(input.Email)
-	if err != nil {
-		return err
-	}
-	if existing != nil {
-		return errors.New(message.MsgHosterEmailExists)
+// Generate token JWT akses dan refresh untuk user.
+func (s *authService) generateToken(userID string) (*AuthResponse, error) {
+	// Access Token (1 jam)
+	expirationTime := time.Now().Add(1 * time.Hour)
+	claims := jwt.RegisteredClaims{
+		Subject:   userID,
+		ExpiresAt: jwt.NewNumericDate(expirationTime),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
 	}
 
-	// Menghasilkan ID unik
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	accessToken, err := token.SignedString(config.GetJWTSecret())
+	if err != nil {
+		return nil, err
+	}
+
+	// Refresh Token (simpan di Redis nanti)
+	refreshToken := uuid.New().String()
+
+	return &AuthResponse{
+		ID:           userID,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    3600,
+	}, nil
+}
+
+// Daftarkan hoster baru dan kembalikan token autentikasi.
+func (s *authService) Register(input *model.HosterModel) (*AuthResponse, error) {
+	// Generate UUID untuk ID
 	input.ID = uuid.New().String()
 
 	// Hash password
-	hashed, err := bcrypt.GenerateFromPassword([]byte(input.PasswordHash), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.PasswordHash), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return nil, errors.New("failed to hash password")
 	}
-	input.PasswordHash = string(hashed)
+	input.PasswordHash = string(hashedPassword)
 
-	// Menyimpan ke database
-	return s.repo.CreateHoster(input)
-}
-
-// Login masuk dengan email dan password
-func (s *authService) Login(email, password string) (*response.Response, error) {
-	// Mencari hoster berdasarkan email
-	hoster, err := s.repo.FindByEmailForLogin(email)
-	if err != nil {
-		log.Printf("Login error: %v", err)
+	// Simpan ke database
+	if err := s.repo.CreateHoster(input); err != nil {
 		return nil, err
 	}
-	if hoster == nil {
+
+	// Generate token (auto login)
+	return s.generateToken(input.ID)
+}
+
+// Validasi kredensial dan kembalikan token akses jika berhasil.
+func (s *authService) Login(email, password string) (*AuthResponse, error) {
+	hoster, err := s.repo.FindByEmailForLogin(email)
+	if err != nil || hoster == nil {
 		return nil, errors.New(message.MsgHosterInvalidCredentials)
 	}
 
-	// Membandingkan password
-	log.Printf("Login attempt: email=%s", email)
 	if err := bcrypt.CompareHashAndPassword([]byte(hoster.PasswordHash), []byte(password)); err != nil {
-		log.Printf("Password mismatch: %v", err)
 		return nil, errors.New(message.MsgHosterInvalidCredentials)
 	}
-	log.Println("Password match! Login success.")
 
-	// Membersihkan data hoster
-	cleanHoster := *hoster
-	cleanHoster.PasswordHash = ""
-
-	// Mengembalikan response
-	return &response.Response{
-		Code:    http.StatusOK,
-		Data:    map[string]interface{}{"hoster": cleanHoster},
-		Message: message.MsgHosterCreatedSuccess,
-		Status:  "success",
-	}, nil
+	return s.generateToken(hoster.ID)
 }

@@ -1,3 +1,4 @@
+// internal/response/response.go
 package response
 
 import (
@@ -5,32 +6,55 @@ import (
 	"net/http"
 )
 
-// Struct untuk format response JSON standar
+// Paket response untuk kirim respons HTTP berformat JSON standar.
+
+// Struktur Response untuk format respons API konsisten.
 type Response struct {
-	Code    int    `json:"code"`           // Kode status HTTP
-	Data    any    `json:"data,omitempty"` // Data respons (opsional)
-	Message string `json:"message"`        // Pesan respons
-	Status  string `json:"status"`         // Status respons
+	Code    int    `json:"code"`           // Kode status HTTP numerik
+	Data    any    `json:"data,omitempty"` // Payload respons; dihilangkan jika kosong
+	Message string `json:"message"`        // Pesan ringkas menjelaskan status atau error
+	Success bool   `json:"success"`        // True jika operasi berhasil
 }
 
-// Mengirim response JSON dengan format standar
-func JSON(w http.ResponseWriter, code int, status string, message string, data interface{}) {
+// Kirim respons JSON sukses dan set header Content-Type.
+func Success(w http.ResponseWriter, code int, data any, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(Response{
+	json.NewEncoder(w).Encode(Response{
 		Code:    code,
-		Status:  status,
-		Message: message,
 		Data:    data,
+		Message: message,
+		Success: true,
 	})
 }
 
-// Mengirim response sukses standar (HTTP 200)
-func SuccessResponse(w http.ResponseWriter, data interface{}) {
-	JSON(w, http.StatusOK, "success", "OK", data)
+// Kirim respons JSON error dan set header Content-Type.
+func Error(w http.ResponseWriter, code int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(Response{
+		Code:    code,
+		Message: message,
+		Success: false,
+	})
 }
 
-// Mengirim response error dengan kode dan pesan khusus
-func ErrorResponse(w http.ResponseWriter, code int, message string) {
-	JSON(w, code, "Error", message, nil)
+// Pintasan untuk kirim respons OK (200) dengan data dan pesan.
+func OK(w http.ResponseWriter, data any, msg string) {
+	Success(w, http.StatusOK, data, msg)
+}
+
+// Pintasan untuk kirim respons Created (201) dengan data dan pesan.
+func Created(w http.ResponseWriter, data any, msg string) {
+	Success(w, http.StatusCreated, data, msg)
+}
+
+// Pintasan untuk kirim respons BadRequest (400) dengan pesan error.
+func BadRequest(w http.ResponseWriter, msg string) {
+	Error(w, http.StatusBadRequest, msg)
+}
+
+// Pintasan untuk kirim respons Unauthorized (401) dengan pesan error.
+func Unauthorized(w http.ResponseWriter, msg string) {
+	Error(w, http.StatusUnauthorized, msg)
 }

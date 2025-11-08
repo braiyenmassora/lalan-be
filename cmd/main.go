@@ -11,15 +11,16 @@ import (
 	"os"
 )
 
+// Inisialisasi aplikasi dan jalankan server HTTP.
 func main() {
-	// Konfigurasi dan koneksi database
+	// Inisialisasi konfigurasi database dan koneksi; hentikan aplikasi jika gagal.
 	cfg, err := config.DatabaseConfig()
 	if err != nil {
 		log.Fatal("Failed to connect DB:", err)
 	}
 	defer cfg.DB.Close()
 
-	// Inisialisasi komponen autentikasi
+	// Inisialisasi komponen autentikasi dengan dependency injection.
 	authRepo := repository.NewAuthRepository(cfg.DB)
 	authService := service.NewAuthService(authRepo)
 	authHandler := handler.NewAuthHandler(authService)
@@ -29,22 +30,22 @@ func main() {
 	categoryRepo := repository.NewCategoryRepository(cfg.DB)
 	categoryService := service.NewCategoryService(categoryRepo)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
-	route.CategoryRoute(categoryHandler)
+	route.CategoryRoutes(categoryHandler)
 
-	// item
-	ItemRepo := repository.NewItemRepository(cfg.DB)
-	itemService := service.NewItemRepository(ItemRepo)
-	itemHandler := handler.NewItemHandlerS(itemService)
-	route.ItemRoute(itemHandler)
+	// Inisialisasi komponen item
+	itemRepo := repository.NewItemRepository(cfg.DB)
+	itemService := service.NewItemService(itemRepo)
+	itemHandler := handler.NewItemHandler(itemService)
+	route.ItemRoutes(itemHandler)
 
-	// Konfigurasi port server
+	// Konfigurasi port server dari environment atau gunakan default.
 	port := os.Getenv("APP_PORT")
 	if port == "" {
 		port = "8080"
 	}
 
 	log.Printf("Server running at http://localhost:%s\n", port)
-	// Menjalankan server HTTP
+	// Jalankan server HTTP pada port tertentu; hentikan aplikasi jika gagal.
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal(err)
 	}
