@@ -10,20 +10,32 @@ import (
 	"strings"
 )
 
+/*
+CategoryHandler menangani request HTTP untuk kategori.
+*/
 type CategoryHandler struct {
 	service service.CategoryService
 }
 
+/*
+NewCategoryHandler membuat instance CategoryHandler dengan service.
+*/
 func NewCategoryHandler(s service.CategoryService) *CategoryHandler {
 	return &CategoryHandler{service: s}
 }
 
+/*
+CategoryRequest merepresentasikan struktur request untuk kategori.
+*/
 type CategoryRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
-// AddCategory menambahkan kategori baru
+/*
+AddCategory menangani request untuk menambahkan kategori.
+Mengembalikan respons sukses atau error.
+*/
 func (h *CategoryHandler) AddCategory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -40,12 +52,12 @@ func (h *CategoryHandler) AddCategory(w http.ResponseWriter, r *http.Request) {
 
 	// Validasi input
 	if strings.TrimSpace(req.Name) == "" {
-		response.BadRequest(w, "Category name is required")
+		response.BadRequest(w, message.MsgCategoryNameRequired)
 		return
 	}
 
 	if len(req.Name) > 255 {
-		response.BadRequest(w, "Category name must not exceed 255 characters")
+		response.BadRequest(w, message.MsgCategoryNameTooLong)
 		return
 	}
 
@@ -63,7 +75,10 @@ func (h *CategoryHandler) AddCategory(w http.ResponseWriter, r *http.Request) {
 	response.Created(w, categoryResp, message.MsgCategoryCreatedSuccess)
 }
 
-// GetAllCategories mendapatkan semua kategori
+/*
+GetAllCategories menangani request untuk mendapatkan semua kategori.
+Mengembalikan respons sukses atau error.
+*/
 func (h *CategoryHandler) GetAllCategories(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -79,7 +94,10 @@ func (h *CategoryHandler) GetAllCategories(w http.ResponseWriter, r *http.Reques
 	response.OK(w, categories, message.MsgSuccess)
 }
 
-// GetCategoryByID mendapatkan kategori berdasarkan ID
+/*
+GetCategoryByID menangani request untuk mendapatkan kategori berdasarkan ID.
+Mengembalikan respons sukses atau error.
+*/
 func (h *CategoryHandler) GetCategoryByID(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -89,7 +107,7 @@ func (h *CategoryHandler) GetCategoryByID(w http.ResponseWriter, r *http.Request
 	// Ambil ID dari query parameter
 	id := r.URL.Query().Get("id")
 	if strings.TrimSpace(id) == "" {
-		response.BadRequest(w, "Category ID is required")
+		response.BadRequest(w, message.MsgCategoryIDRequired)
 		return
 	}
 
@@ -106,7 +124,10 @@ func (h *CategoryHandler) GetCategoryByID(w http.ResponseWriter, r *http.Request
 	response.OK(w, category, message.MsgSuccess)
 }
 
-// UpdateCategory mengupdate kategori
+/*
+UpdateCategory menangani request untuk mengupdate kategori.
+Mengembalikan respons sukses atau error.
+*/
 func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -116,7 +137,7 @@ func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request)
 	// Ambil ID dari query parameter
 	id := r.URL.Query().Get("id")
 	if strings.TrimSpace(id) == "" {
-		response.BadRequest(w, "Category ID is required")
+		response.BadRequest(w, message.MsgCategoryIDRequired)
 		return
 	}
 
@@ -130,12 +151,12 @@ func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request)
 
 	// Validasi input
 	if strings.TrimSpace(req.Name) == "" {
-		response.BadRequest(w, "Category name is required")
+		response.BadRequest(w, message.MsgCategoryNameRequired)
 		return
 	}
 
 	if len(req.Name) > 255 {
-		response.BadRequest(w, "Category name must not exceed 255 characters")
+		response.BadRequest(w, message.MsgCategoryNameTooLong)
 		return
 	}
 
@@ -154,10 +175,13 @@ func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	response.OK(w, categoryResp, "Category updated successfully")
+	response.OK(w, categoryResp, message.MsgCategoryUpdatedSuccess)
 }
 
-// DeleteCategory menghapus kategori
+/*
+DeleteCategory menangani request untuk menghapus kategori.
+Mengembalikan respons sukses atau error.
+*/
 func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -167,7 +191,7 @@ func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request)
 	// Ambil ID dari query parameter
 	id := r.URL.Query().Get("id")
 	if strings.TrimSpace(id) == "" {
-		response.BadRequest(w, "Category ID is required")
+		response.BadRequest(w, message.MsgCategoryIDRequired)
 		return
 	}
 
@@ -181,5 +205,5 @@ func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	response.OK(w, nil, "Category deleted successfully")
+	response.OK(w, nil, message.MsgCategoryDeletedSuccess)
 }

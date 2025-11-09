@@ -6,7 +6,9 @@ import (
 	"net/http"
 )
 
-// CategoryRoutes mengatur semua rute untuk kategori dengan JWT protection
+/*
+CategoryRoutes mendaftarkan route untuk kategori.
+*/
 func CategoryRoutes(h *handler.CategoryHandler) {
 	v1 := "/v1/category"
 

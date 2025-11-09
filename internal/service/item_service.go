@@ -10,6 +10,9 @@ import (
 	"github.com/google/uuid"
 )
 
+/*
+ItemService mendefinisikan operasi untuk layanan item.
+*/
 type ItemService interface {
 	AddItem(input *model.ItemModel) (*model.ItemModel, error)
 	GetAllItems() ([]*model.ItemModel, error)
@@ -19,17 +22,25 @@ type ItemService interface {
 	DeleteItem(id string, userID string) error
 }
 
+/*
+itemService mengimplementasikan ItemService.
+*/
 type itemService struct {
 	repo repository.ItemRepository
 }
 
+/*
+NewItemService membuat instance ItemService dengan repository.
+*/
 func NewItemService(repo repository.ItemRepository) ItemService {
 	return &itemService{repo: repo}
 }
 
-// AddItem menambahkan item baru
+/*
+AddItem menambahkan item baru.
+Mengembalikan model atau error.
+*/
 func (s *itemService) AddItem(input *model.ItemModel) (*model.ItemModel, error) {
-	// Validasi input
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
 
@@ -52,7 +63,6 @@ func (s *itemService) AddItem(input *model.ItemModel) (*model.ItemModel, error) 
 		return nil, errors.New("deposit cannot be negative")
 	}
 
-	// Cek apakah nama item sudah ada untuk user ini
 	existing, err := s.repo.FindItemNameByUserID(input.Name, input.UserID)
 	if err != nil {
 		return nil, err
@@ -61,24 +71,27 @@ func (s *itemService) AddItem(input *model.ItemModel) (*model.ItemModel, error) 
 		return nil, errors.New(message.MsgItemNameExists)
 	}
 
-	// Generate ID unik
 	input.ID = uuid.New().String()
 
-	// Simpan item ke database
 	if err := s.repo.CreateItem(input); err != nil {
 		return nil, err
 	}
 
-	// Return item yang baru dibuat
 	return s.repo.FindByID(input.ID)
 }
 
-// GetAllItems mendapatkan semua item
+/*
+GetAllItems mendapatkan semua item.
+Mengembalikan slice model atau error.
+*/
 func (s *itemService) GetAllItems() ([]*model.ItemModel, error) {
 	return s.repo.FindAll()
 }
 
-// GetItemByID mendapatkan item berdasarkan ID
+/*
+GetItemByID mendapatkan item berdasarkan ID.
+Mengembalikan model atau error.
+*/
 func (s *itemService) GetItemByID(id string) (*model.ItemModel, error) {
 	if id == "" {
 		return nil, errors.New("item ID is required")
@@ -95,7 +108,10 @@ func (s *itemService) GetItemByID(id string) (*model.ItemModel, error) {
 	return item, nil
 }
 
-// GetItemsByUserID mendapatkan semua item milik user tertentu
+/*
+GetItemsByUserID mendapatkan semua item berdasarkan user ID.
+Mengembalikan slice model atau error.
+*/
 func (s *itemService) GetItemsByUserID(userID string) ([]*model.ItemModel, error) {
 	if userID == "" {
 		return nil, errors.New("user ID is required")
@@ -104,9 +120,11 @@ func (s *itemService) GetItemsByUserID(userID string) ([]*model.ItemModel, error
 	return s.repo.FindByUserID(userID)
 }
 
-// UpdateItem mengupdate item
+/*
+UpdateItem mengupdate item berdasarkan ID dan user ID.
+Mengembalikan model atau error.
+*/
 func (s *itemService) UpdateItem(id string, userID string, input *model.ItemModel) (*model.ItemModel, error) {
-	// Validasi ID
 	if id == "" {
 		return nil, errors.New("item ID is required")
 	}
@@ -114,7 +132,6 @@ func (s *itemService) UpdateItem(id string, userID string, input *model.ItemMode
 		return nil, errors.New("user ID is required")
 	}
 
-	// Validasi input
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
 
@@ -134,7 +151,6 @@ func (s *itemService) UpdateItem(id string, userID string, input *model.ItemMode
 		return nil, errors.New("deposit cannot be negative")
 	}
 
-	// Cek apakah item ada dan milik user ini
 	existing, err := s.repo.FindByID(id)
 	if err != nil {
 		return nil, err
@@ -146,7 +162,6 @@ func (s *itemService) UpdateItem(id string, userID string, input *model.ItemMode
 		return nil, errors.New("unauthorized: you can only update your own items")
 	}
 
-	// Cek apakah nama baru sudah digunakan item lain dari user ini
 	if input.Name != existing.Name {
 		duplicate, err := s.repo.FindItemNameByUserID(input.Name, userID)
 		if err != nil {
@@ -157,18 +172,19 @@ func (s *itemService) UpdateItem(id string, userID string, input *model.ItemMode
 		}
 	}
 
-	// Update item
 	input.ID = id
 	input.UserID = userID
 	if err := s.repo.Update(input); err != nil {
 		return nil, err
 	}
 
-	// Return item yang sudah diupdate
 	return s.repo.FindByID(id)
 }
 
-// DeleteItem menghapus item
+/*
+DeleteItem menghapus item berdasarkan ID dan user ID.
+Mengembalikan error.
+*/
 func (s *itemService) DeleteItem(id string, userID string) error {
 	if id == "" {
 		return errors.New("item ID is required")
@@ -177,7 +193,6 @@ func (s *itemService) DeleteItem(id string, userID string) error {
 		return errors.New("user ID is required")
 	}
 
-	// Cek apakah item ada dan milik user ini
 	existing, err := s.repo.FindByID(id)
 	if err != nil {
 		return err
@@ -189,6 +204,5 @@ func (s *itemService) DeleteItem(id string, userID string) error {
 		return errors.New("unauthorized: you can only delete your own items")
 	}
 
-	// Hapus item
 	return s.repo.Delete(id)
 }

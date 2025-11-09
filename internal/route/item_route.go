@@ -6,7 +6,9 @@ import (
 	"net/http"
 )
 
-// ItemRoutes mengatur semua rute untuk item dengan JWT protection
+/*
+ItemRoutes mendaftarkan route untuk item.
+*/
 func ItemRoutes(h *handler.ItemHandler) {
 	v1 := "/v1/item"
 

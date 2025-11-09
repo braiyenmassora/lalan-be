@@ -1,33 +1,42 @@
-// internal/handler/auth_handler.go
 package handler
 
 import (
 	"encoding/json"
+	"net/http"
+
 	"lalan-be/internal/middleware"
 	"lalan-be/internal/model"
 	"lalan-be/internal/response"
 	"lalan-be/internal/service"
 	"lalan-be/pkg/message"
-	"net/http"
 )
 
-// Paket handler untuk handle request HTTP autentikasi.
-
-// Struktur handler autentikasi dengan dependency service.
+/*
+Struct untuk menangani request autentikasi.
+Mengandung service untuk operasi bisnis.
+*/
 type AuthHandler struct {
 	service service.AuthService
 }
 
-// Buat instance handler autentikasi dengan service.
+/*
+Membuat instance handler dengan service autentikasi.
+Mengembalikan pointer ke AuthHandler.
+*/
 func NewAuthHandler(s service.AuthService) *AuthHandler {
 	return &AuthHandler{service: s}
 }
 
-// Struktur request untuk registrasi hoster.
+/*
+Struct untuk merepresentasikan request registrasi hoster.
+*/
 type RegisterRequest struct {
 	FullName     string `json:"full_name"`
 	ProfilePhoto string `json:"profile_photo"`
 	StoreName    string `json:"store_name"`
+	Website      string `json:"website"`
+	Instagram    string `json:"instagram"`
+	Tiktok       string `json:"tiktok"`
 	Description  string `json:"description"`
 	PhoneNumber  string `json:"phone_number"`
 	Email        string `json:"email"`
@@ -35,7 +44,10 @@ type RegisterRequest struct {
 	Password     string `json:"password"`
 }
 
-// Handle registrasi hoster dan kembalikan token.
+/*
+Menangani request registrasi hoster.
+Mengembalikan respons sukses atau error.
+*/
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -53,6 +65,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		ProfilePhoto: req.ProfilePhoto,
 		StoreName:    req.StoreName,
 		Description:  req.Description,
+		Website:      req.Website,
+		Instagram:    req.Instagram,
+		Tiktok:       req.Tiktok,
 		PhoneNumber:  req.PhoneNumber,
 		Email:        req.Email,
 		Address:      req.Address,
@@ -68,10 +83,13 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	response.Created(w, authResp, message.MsgHosterCreatedSuccess)
 }
 
-// Handle login hoster dan kembalikan token.
+/*
+Menangani request login hoster.
+Mengembalikan respons sukses atau error.
+*/
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		response.BadRequest(w, "Method not allowed")
+		response.BadRequest(w, message.MsgNotAllowed)
 		return
 	}
 
@@ -94,7 +112,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, authResp, "Hoster logged in successfully.")
 }
 
-// Handle test endpoint terproteksi dengan JWT.
+/*
+Menangani request test endpoint terproteksi.
+Mengembalikan informasi user jika token valid.
+*/
 func (h *AuthHandler) TestProtected(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
 	if userID == "" {

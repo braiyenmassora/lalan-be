@@ -9,23 +9,28 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// Paket config untuk handle konfigurasi aplikasi dan koneksi database.
-
-// Struktur Config untuk simpan instance koneksi database.
+/*
+Struct untuk menyimpan koneksi database.
+*/
 type Config struct {
-	DB *sqlx.DB // Instance koneksi database
+	DB *sqlx.DB
 }
 
-// Ambil nilai environment dengan fallback untuk konfigurasi aman.
+/*
+Mengambil nilai environment dengan fallback.
+Mengembalikan string nilai atau fallback.
+*/
 func getEnv(key, fallback string) string {
-	// Ambil variabel environment atau gunakan fallback
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
 	return fallback
 }
 
-// Inisialisasi koneksi database PostgreSQL dan verifikasi konektivitas.
+/*
+Menginisialisasi koneksi database PostgreSQL.
+Mengembalikan pointer ke Config atau error jika gagal.
+*/
 func DatabaseConfig() (*Config, error) {
 	// Muat variabel environment dari .env.dev
 	_ = godotenv.Load(".env.dev")
@@ -52,12 +57,15 @@ func DatabaseConfig() (*Config, error) {
 	return &Config{DB: db}, nil
 }
 
-// Ambil secret JWT dari environment untuk autentikasi aman.
+/*
+Mengambil secret JWT dari environment.
+Mengembalikan byte slice secret.
+*/
 func GetJWTSecret() []byte {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
 		// Default untuk development (WARNING: harus ada di .env production!)
-		return []byte("super-rahasia-123-ubah-nanti")
+		return []byte("testingfordev")
 	}
 	return []byte(secret)
 }

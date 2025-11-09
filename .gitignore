@@ -17,18 +17,23 @@ go.work
 # Dependency directories
 vendor/
 
-# Environment variables
+# Environment variables (penting untuk keamanan, jangan push!)
 .env
 .env.dev
 *.env
+.env.local
+.env.production
 
 # Temporary files and directories
 tmp/
 *.tmp
+dist/
+build/
 
 # Log files
 *.log
 build-errors.log
+logs/
 
 # IDE/Editor specific
 .vscode/
@@ -40,3 +45,25 @@ build-errors.log
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Security-related files 
+*.key
+*.pem
+*.crt
+secrets/
+config/secrets.json
+
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Coverage reports
+coverage.html
+coverage.xml
+
+# Miscellaneous
+*.bak
+*.old
+.cache/

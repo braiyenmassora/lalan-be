@@ -9,7 +9,9 @@ import (
 	"github.com/lib/pq"
 )
 
-// ItemRepository interface
+/*
+ItemRepository mendefinisikan operasi untuk mengelola data item di database.
+*/
 type ItemRepository interface {
 	FindItemNameByUserID(name string, userId string) (*model.ItemModel, error)
 	CreateItem(item *model.ItemModel) error
@@ -20,17 +22,25 @@ type ItemRepository interface {
 	Delete(id string) error
 }
 
-// itemRepository struct
+/*
+itemRepository menyimpan koneksi database untuk operasi repository item.
+*/
 type itemRepository struct {
-	db *sqlx.DB // koneksi database
+	db *sqlx.DB
 }
 
-// NewItemRepository constructor
+/*
+NewItemRepository membuat instance ItemRepository dengan koneksi database.
+Mengembalikan interface ItemRepository.
+*/
 func NewItemRepository(db *sqlx.DB) ItemRepository {
 	return &itemRepository{db: db}
 }
 
-// FindItemNameByUserID method
+/*
+FindItemNameByUserID mencari item berdasarkan nama dan user ID.
+Mengembalikan pointer ke model dan error; (nil, nil) jika tidak ditemukan.
+*/
 func (r *itemRepository) FindItemNameByUserID(name string, userId string) (*model.ItemModel, error) {
 	query := `SELECT id, name, description, photos, stock, pickup_type, price_per_day, deposit, discount, category_id, user_id, created_at, updated_at 
 	          FROM items WHERE name = $1 AND user_id = $2 LIMIT 1`
@@ -52,7 +62,10 @@ func (r *itemRepository) FindItemNameByUserID(name string, userId string) (*mode
 	return &item, nil
 }
 
-// CreateItem method
+/*
+CreateItem menyisipkan item baru ke tabel items.
+Mengembalikan error jika gagal.
+*/
 func (r *itemRepository) CreateItem(item *model.ItemModel) error {
 	query := `INSERT INTO items (id, name, description, photos, stock, pickup_type, price_per_day, deposit, discount, category_id, user_id, created_at, updated_at) 
 	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())`
@@ -69,7 +82,10 @@ func (r *itemRepository) CreateItem(item *model.ItemModel) error {
 	return nil
 }
 
-// FindAll method
+/*
+FindAll mengambil semua item dari tabel items dalam urutan descending.
+Mengembalikan slice pointer ke model dan error jika gagal.
+*/
 func (r *itemRepository) FindAll() ([]*model.ItemModel, error) {
 	query := `SELECT id, name, description, photos, stock, pickup_type, price_per_day, deposit, discount, category_id, user_id, created_at, updated_at 
 	          FROM items ORDER BY created_at DESC`
@@ -98,7 +114,10 @@ func (r *itemRepository) FindAll() ([]*model.ItemModel, error) {
 	return items, nil
 }
 
-// FindByID method
+/*
+FindByID mencari item berdasarkan ID di tabel items.
+Mengembalikan pointer ke model dan error; (nil, nil) jika tidak ditemukan.
+*/
 func (r *itemRepository) FindByID(id string) (*model.ItemModel, error) {
 	query := `SELECT id, name, description, photos, stock, pickup_type, price_per_day, deposit, discount, category_id, user_id, created_at, updated_at 
 	          FROM items WHERE id = $1 LIMIT 1`
@@ -120,7 +139,10 @@ func (r *itemRepository) FindByID(id string) (*model.ItemModel, error) {
 	return &item, nil
 }
 
-// FindByUserID method
+/*
+FindByUserID mengambil semua item berdasarkan user ID dalam urutan descending.
+Mengembalikan slice pointer ke model dan error jika gagal.
+*/
 func (r *itemRepository) FindByUserID(userID string) ([]*model.ItemModel, error) {
 	query := `SELECT id, name, description, photos, stock, pickup_type, price_per_day, deposit, discount, category_id, user_id, created_at, updated_at 
 	          FROM items WHERE user_id = $1 ORDER BY created_at DESC`
@@ -149,7 +171,10 @@ func (r *itemRepository) FindByUserID(userID string) ([]*model.ItemModel, error)
 	return items, nil
 }
 
-// Update method
+/*
+Update memperbarui data item di tabel items berdasarkan ID.
+Mengembalikan error jika gagal atau tidak ada baris yang terpengaruh.
+*/
 func (r *itemRepository) Update(item *model.ItemModel) error {
 	query := `UPDATE items 
 	          SET name = $2, description = $3, photos = $4, stock = $5, pickup_type = $6, 
@@ -177,7 +202,10 @@ func (r *itemRepository) Update(item *model.ItemModel) error {
 	return nil
 }
 
-// Delete method
+/*
+Delete menghapus item dari tabel items berdasarkan ID.
+Mengembalikan error jika gagal atau tidak ada baris yang terpengaruh.
+*/
 func (r *itemRepository) Delete(id string) error {
 	query := "DELETE FROM items WHERE id = $1"
 

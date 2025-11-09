@@ -9,41 +9,57 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// Paket repository untuk akses data database.
-
-// Interface untuk operasi autentikasi hoster.
+/*
+Interface untuk operasi autentikasi hoster.
+Mendefinisikan method untuk membuat dan mengambil data hoster.
+*/
 type AuthRepository interface {
-	CreateHoster(hoster *model.HosterModel) error                 // Simpan hoster baru
-	FindByEmail(email string) (*model.HosterModel, error)         // Cari hoster berdasarkan email
-	FindByEmailForLogin(email string) (*model.HosterModel, error) // Cari hoster untuk login
+	CreateHoster(hoster *model.HosterModel) error
+	FindByEmail(email string) (*model.HosterModel, error)
+	FindByEmailForLogin(email string) (*model.HosterModel, error)
 }
 
-// Struktur implementasi repository autentikasi.
+/*
+Struct untuk menyimpan koneksi database.
+Digunakan sebagai implementasi interface AuthRepository.
+*/
 type authRepository struct {
-	db *sqlx.DB // Koneksi database
+	db *sqlx.DB
 }
 
-// Buat instance repository autentikasi dengan koneksi database.
+/*
+Membuat instance repository dengan koneksi database.
+Mengembalikan interface AuthRepository.
+*/
 func NewAuthRepository(db *sqlx.DB) AuthRepository {
 	return &authRepository{db: db}
 }
 
-// Simpan hoster baru ke database.
+/*
+Menyisipkan data hoster ke tabel hosters.
+Mengembalikan error jika gagal.
+*/
 func (r *authRepository) CreateHoster(h *model.HosterModel) error {
-	// Insert data hoster
 	query := `
-		INSERT INTO hosters (
-			id, full_name, profile_photo, store_name, description, phone_number, email, address, password_hash
-		)
-		VALUES (:id, :full_name, :profile_photo, :store_name, :description, :phone_number, :email, :address, :password_hash)
-	`
+        INSERT INTO hosters (
+            id, full_name, profile_photo, store_name, description, phone_number, email, address, password_hash, website, instagram, tiktok
+        )
+        VALUES (:id, :full_name, :profile_photo, :store_name, :description, :phone_number, :email, :address, :password_hash, :website, :instagram, :tiktok)
+    `
 	_, err := r.db.NamedExec(query, h)
-	return err
+	if err != nil {
+		log.Printf("Error inserting hoster: %v", err)
+		return err
+	}
+
+	return nil
 }
 
-// Cari hoster berdasarkan email.
+/*
+Mengambil data hoster lengkap dari tabel hosters berdasarkan email.
+Mengembalikan pointer ke model dan error; (nil, nil) jika tidak ada baris.
+*/
 func (r *authRepository) FindByEmail(email string) (*model.HosterModel, error) {
-	// Cari hoster berdasarkan email
 	var hoster model.HosterModel
 	query := `SELECT * FROM hosters WHERE email = $1 LIMIT 1`
 
@@ -57,23 +73,24 @@ func (r *authRepository) FindByEmail(email string) (*model.HosterModel, error) {
 	return &hoster, nil
 }
 
-// Cari hoster untuk proses login dengan field tertentu.
+/*
+Mengambil data hoster untuk autentikasi dari tabel hosters berdasarkan email.
+Mengembalikan pointer ke model dan error; (nil, nil) jika tidak ada baris.
+*/
 func (r *authRepository) FindByEmailForLogin(email string) (*model.HosterModel, error) {
-	// Cari hoster untuk login
 	var h model.HosterModel
 
 	query := `
-		SELECT
-			id, email, password_hash, full_name, phone_number,
-			store_name, description, address, profile_photo,
-			created_at, updated_at
-		FROM hosters
-		WHERE email = $1
-		  AND password_hash IS NOT NULL
-		LIMIT 1
-	`
+        SELECT
+            id, email, password_hash, full_name, phone_number,
+            store_name, description, address, profile_photo, website, instagram, tiktok,
+            created_at, updated_at
+        FROM hosters
+        WHERE email = $1
+          AND password_hash IS NOT NULL
+        LIMIT 1
+    `
 
-	// Scan hasil query
 	err := r.db.QueryRow(query, email).Scan(
 		&h.ID,
 		&h.Email,
@@ -84,6 +101,9 @@ func (r *authRepository) FindByEmailForLogin(email string) (*model.HosterModel, 
 		&h.Description,
 		&h.Address,
 		&h.ProfilePhoto,
+		&h.Website,
+		&h.Instagram,
+		&h.Tiktok,
 		&h.CreatedAt,
 		&h.UpdatedAt,
 	)
@@ -92,7 +112,6 @@ func (r *authRepository) FindByEmailForLogin(email string) (*model.HosterModel, 
 		return nil, nil
 	}
 	if err != nil {
-		log.Printf("Login query failed: %v | email: %s", err, email)
 		return nil, err
 	}
 

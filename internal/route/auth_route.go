@@ -8,9 +8,9 @@ import (
 	"lalan-be/internal/middleware"
 )
 
-// Paket route untuk setup routing HTTP aplikasi.
-
-// Register route autentikasi dan lindungi endpoint dengan middleware JWT.
+/*
+Mendaftarkan route untuk autentikasi.
+*/
 func AuthRoutes(h *handler.AuthHandler) {
 	v1 := "/v1"
 	http.HandleFunc(v1+"/auth/register", h.Register)

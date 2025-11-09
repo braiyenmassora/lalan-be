@@ -11,7 +11,9 @@ import (
 	"os"
 )
 
-// Inisialisasi aplikasi dan jalankan server HTTP.
+/*
+Menginisialisasi dan menjalankan aplikasi server.
+*/
 func main() {
 	// Inisialisasi konfigurasi database dan koneksi; hentikan aplikasi jika gagal.
 	cfg, err := config.DatabaseConfig()

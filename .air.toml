@@ -1,47 +1,80 @@
-# yaml-language-server: $schema=
+# Konfigurasi untuk air (hot reload tool) dalam development.
 root = "."
 testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
+  # Argumen untuk binary
   args_bin = []
+  # Path binary hasil build
   bin = "./tmp/main"
+  # Command untuk build
   cmd = "go build -o ./tmp/main ./cmd/main.go"
+  # Delay sebelum rebuild (ms)
   delay = 1000
+  # Direktori yang dikecualikan dari watch
   exclude_dir = ["assets", "tmp", "vendor", "testdata"]
+  # File yang dikecualikan dari watch
   exclude_file = []
+  # Regex file yang dikecualikan
   exclude_regex = ["_test.go"]
+  # Exclude file yang tidak berubah
   exclude_unchanged = false
+  # Follow symlink
   follow_symlink = false
+  # Full path binary
   full_bin = ""
+  # Direktori yang diinclude
   include_dir = []
+  # Ekstensi file yang diwatch
   include_ext = ["go", "tpl", "tmpl", "html"]
+  # File yang diinclude
   include_file = []
+  # Delay sebelum kill process
   kill_delay = "0s"
+  # File log error
   log = "build-errors.log"
+  # Poll mode
   poll = false
+  # Interval poll
   poll_interval = 0
+  # Command setelah build
   post_cmd = []
+  # Command sebelum build
   pre_cmd = []
+  # Rerun binary setelah build
   rerun = false
+  # Delay rerun
   rerun_delay = 500
+  # Send interrupt signal
   send_interrupt = false
+  # Stop on error
   stop_on_error = false
 
 [color]
-  app = ""
+  # Warna log untuk app
+  app = "green"
+  # Warna log untuk build
   build = "yellow"
+  # Warna log untuk main
   main = "magenta"
+  # Warna log untuk runner
   runner = "green"
+  # Warna log untuk watcher
   watcher = "cyan"
 
 [log]
+  # Log hanya main
   main_only = false
+  # Tampilkan waktu
   time = false
 
 [misc]
+  # Clean on exit
   clean_on_exit = false
 
 [screen]
+  # Clear screen on rebuild
   clear_on_rebuild = false
+  # Keep scroll
   keep_scroll = true

@@ -10,33 +10,42 @@ import (
 	"github.com/google/uuid"
 )
 
-// CategoryService adalah interface untuk menangani operasi kategori
+/*
+CategoryService mendefinisikan operasi untuk layanan kategori.
+*/
 type CategoryService interface {
-	AddCategory(input *model.CategoryModel) (*model.CategoryModel, error)               // Menambahkan kategori baru
-	GetAllCategories() ([]*model.CategoryModel, error)                                  // Mendapatkan semua kategori
-	GetCategoryByID(id string) (*model.CategoryModel, error)                            // Mendapatkan kategori berdasarkan ID
-	UpdateCategory(id string, input *model.CategoryModel) (*model.CategoryModel, error) // Mengupdate kategori
-	DeleteCategory(id string) error                                                     // Menghapus kategori
+	AddCategory(input *model.CategoryModel) (*model.CategoryModel, error)
+	GetAllCategories() ([]*model.CategoryModel, error)
+	GetCategoryByID(id string) (*model.CategoryModel, error)
+	UpdateCategory(id string, input *model.CategoryModel) (*model.CategoryModel, error)
+	DeleteCategory(id string) error
 }
 
-// categoryService adalah struct yang mengimplementasikan CategoryService
+/*
+categoryService mengimplementasikan CategoryService.
+*/
 type categoryService struct {
-	repo repository.CategoryRepository // Repository untuk operasi kategori
+	repo repository.CategoryRepository
 }
 
-// NewCategoryService membuat instance CategoryService
+/*
+NewCategoryService membuat instance CategoryService dengan repository.
+*/
 func NewCategoryService(repo repository.CategoryRepository) CategoryService {
 	return &categoryService{repo: repo}
 }
 
-// AddCategory menambahkan kategori baru
+/*
+AddCategory menambahkan kategori baru.
+Mengembalikan model atau error.
+*/
 func (s *categoryService) AddCategory(input *model.CategoryModel) (*model.CategoryModel, error) {
 	// Validasi input
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
 
 	if input.Name == "" {
-		return nil, errors.New("category name is required")
+		return nil, errors.New(message.MsgCategoryNameRequired)
 	}
 
 	// Memeriksa apakah nama kategori sudah ada
@@ -60,15 +69,21 @@ func (s *categoryService) AddCategory(input *model.CategoryModel) (*model.Catego
 	return s.repo.FindByID(input.ID)
 }
 
-// GetAllCategories mendapatkan semua kategori
+/*
+GetAllCategories mendapatkan semua kategori.
+Mengembalikan slice model atau error.
+*/
 func (s *categoryService) GetAllCategories() ([]*model.CategoryModel, error) {
 	return s.repo.FindAll()
 }
 
-// GetCategoryByID mendapatkan kategori berdasarkan ID
+/*
+GetCategoryByID mendapatkan kategori berdasarkan ID.
+Mengembalikan model atau error.
+*/
 func (s *categoryService) GetCategoryByID(id string) (*model.CategoryModel, error) {
 	if id == "" {
-		return nil, errors.New("category ID is required")
+		return nil, errors.New(message.MsgCategoryIDRequired)
 	}
 
 	category, err := s.repo.FindByID(id)
@@ -82,11 +97,14 @@ func (s *categoryService) GetCategoryByID(id string) (*model.CategoryModel, erro
 	return category, nil
 }
 
-// UpdateCategory mengupdate kategori
+/*
+UpdateCategory mengupdate kategori berdasarkan ID.
+Mengembalikan model atau error.
+*/
 func (s *categoryService) UpdateCategory(id string, input *model.CategoryModel) (*model.CategoryModel, error) {
 	// Validasi ID
 	if id == "" {
-		return nil, errors.New("category ID is required")
+		return nil, errors.New(message.MsgCategoryIDRequired)
 	}
 
 	// Validasi input
@@ -94,7 +112,7 @@ func (s *categoryService) UpdateCategory(id string, input *model.CategoryModel) 
 	input.Description = strings.TrimSpace(input.Description)
 
 	if input.Name == "" {
-		return nil, errors.New("category name is required")
+		return nil, errors.New(message.MsgCategoryNameRequired)
 	}
 
 	// Cek apakah kategori ada
@@ -127,10 +145,13 @@ func (s *categoryService) UpdateCategory(id string, input *model.CategoryModel) 
 	return s.repo.FindByID(id)
 }
 
-// DeleteCategory menghapus kategori
+/*
+DeleteCategory menghapus kategori berdasarkan ID.
+Mengembalikan error.
+*/
 func (s *categoryService) DeleteCategory(id string) error {
 	if id == "" {
-		return errors.New("category ID is required")
+		return errors.New(message.MsgCategoryIDRequired)
 	}
 
 	// Cek apakah kategori ada

@@ -2,22 +2,28 @@ package middleware
 
 import (
 	"context"
-	"lalan-be/internal/config"
-	"lalan-be/internal/response"
 	"net/http"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+
+	"lalan-be/internal/config"
+	"lalan-be/internal/response"
 )
 
-// Paket middleware untuk handle autentikasi JWT pada request HTTP.
-
-// Context key untuk simpan user ID secara aman.
+/*
+Tipe untuk key context.
+*/
 type contextKey string
 
+/*
+Konstanta key untuk user ID di context.
+*/
 const UserIDKey contextKey = "user_id"
 
-// Validasi token JWT dan set user ID ke context; blok akses tanpa token valid.
+/*
+Middleware untuk validasi JWT dan menambahkan user ID ke context.
+*/
 func JWTMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 1. Ambil header Authorization
@@ -57,7 +63,9 @@ func JWTMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// Ambil user ID dari context request untuk autentikasi.
+/*
+Mengambil user ID dari context request.
+*/
 func GetUserID(r *http.Request) string {
 	if id, ok := r.Context().Value(UserIDKey).(string); ok {
 		return id

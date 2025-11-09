@@ -11,14 +11,17 @@ import (
 	"strings"
 )
 
+/* ItemHandler menangani request HTTP untuk item. */
 type ItemHandler struct {
 	service service.ItemService
 }
 
+/* NewItemHandler membuat instance ItemHandler dengan service. */
 func NewItemHandler(s service.ItemService) *ItemHandler {
 	return &ItemHandler{service: s}
 }
 
+/* ItemRequest merepresentasikan struktur request untuk item. */
 type ItemRequest struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
@@ -31,7 +34,7 @@ type ItemRequest struct {
 	CategoryID  string   `json:"category_id"`
 }
 
-// AddItem menambahkan item baru
+/* AddItem menangani request untuk menambahkan item. */
 func (h *ItemHandler) AddItem(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -55,15 +58,15 @@ func (h *ItemHandler) AddItem(w http.ResponseWriter, r *http.Request) {
 
 	// Validasi input
 	if strings.TrimSpace(req.Name) == "" {
-		response.BadRequest(w, "Item name is required")
+		response.BadRequest(w, message.MsgItemNameRequired)
 		return
 	}
 	if len(req.Name) > 255 {
-		response.BadRequest(w, "Item name must not exceed 255 characters")
+		response.BadRequest(w, message.MsgItemNameTooLong)
 		return
 	}
 	if req.CategoryID == "" {
-		response.BadRequest(w, "Category ID is required")
+		response.BadRequest(w, message.MsgCategoryIDRequired)
 		return
 	}
 	if req.PickupType != "pickup" && req.PickupType != "delivery" {
@@ -93,7 +96,7 @@ func (h *ItemHandler) AddItem(w http.ResponseWriter, r *http.Request) {
 	response.Created(w, itemResp, message.MsgItemCreatedSuccess)
 }
 
-// GetAllItems mendapatkan semua item
+/* GetAllItems menangani request untuk mendapatkan semua item. */
 func (h *ItemHandler) GetAllItems(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -109,7 +112,7 @@ func (h *ItemHandler) GetAllItems(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, items, message.MsgSuccess)
 }
 
-// GetItemByID mendapatkan item berdasarkan ID
+/* GetItemByID menangani request untuk mendapatkan item berdasarkan ID. */
 func (h *ItemHandler) GetItemByID(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -119,7 +122,7 @@ func (h *ItemHandler) GetItemByID(w http.ResponseWriter, r *http.Request) {
 	// Ambil ID dari query parameter
 	id := r.URL.Query().Get("id")
 	if strings.TrimSpace(id) == "" {
-		response.BadRequest(w, "Item ID is required")
+		response.BadRequest(w, message.MsgItemIDRequired)
 		return
 	}
 
@@ -136,7 +139,7 @@ func (h *ItemHandler) GetItemByID(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, item, message.MsgSuccess)
 }
 
-// GetMyItems mendapatkan semua item milik user yang login
+/* GetMyItems menangani request untuk mendapatkan item milik user. */
 func (h *ItemHandler) GetMyItems(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -159,7 +162,7 @@ func (h *ItemHandler) GetMyItems(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, items, message.MsgSuccess)
 }
 
-// UpdateItem mengupdate item
+/* UpdateItem menangani request untuk mengupdate item. */
 func (h *ItemHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -176,7 +179,7 @@ func (h *ItemHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 	// Ambil ID dari query parameter
 	id := r.URL.Query().Get("id")
 	if strings.TrimSpace(id) == "" {
-		response.BadRequest(w, "Item ID is required")
+		response.BadRequest(w, message.MsgItemIDRequired)
 		return
 	}
 
@@ -190,15 +193,15 @@ func (h *ItemHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 
 	// Validasi input
 	if strings.TrimSpace(req.Name) == "" {
-		response.BadRequest(w, "Item name is required")
+		response.BadRequest(w, message.MsgItemNameRequired)
 		return
 	}
 	if len(req.Name) > 255 {
-		response.BadRequest(w, "Item name must not exceed 255 characters")
+		response.BadRequest(w, message.MsgItemNameTooLong)
 		return
 	}
 	if req.CategoryID == "" {
-		response.BadRequest(w, "Category ID is required")
+		response.BadRequest(w, message.MsgCategoryIDRequired)
 		return
 	}
 	if req.PickupType != "pickup" && req.PickupType != "delivery" {
@@ -222,7 +225,7 @@ func (h *ItemHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err.Error() == message.MsgItemNotFound {
 			response.Error(w, http.StatusNotFound, err.Error())
-		} else if strings.Contains(err.Error(), "unauthorized") {
+		} else if strings.Contains(err.Error(), message.MsgNotAllowed) {
 			response.Unauthorized(w, err.Error())
 		} else {
 			response.BadRequest(w, err.Error())
@@ -230,10 +233,10 @@ func (h *ItemHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.OK(w, itemResp, "Item updated successfully")
+	response.OK(w, itemResp, message.MsgItemUpdatedSuccess)
 }
 
-// DeleteItem menghapus item
+/* DeleteItem menangani request untuk menghapus item. */
 func (h *ItemHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -250,7 +253,7 @@ func (h *ItemHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	// Ambil ID dari query parameter
 	id := r.URL.Query().Get("id")
 	if strings.TrimSpace(id) == "" {
-		response.BadRequest(w, "Item ID is required")
+		response.BadRequest(w, message.MsgItemIDRequired)
 		return
 	}
 
@@ -258,7 +261,7 @@ func (h *ItemHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err.Error() == message.MsgItemNotFound {
 			response.Error(w, http.StatusNotFound, err.Error())
-		} else if strings.Contains(err.Error(), "unauthorized") {
+		} else if strings.Contains(err.Error(), message.MsgNotAllowed) {
 			response.Unauthorized(w, err.Error())
 		} else {
 			response.BadRequest(w, err.Error())
@@ -266,5 +269,5 @@ func (h *ItemHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.OK(w, nil, "Item deleted successfully")
+	response.OK(w, nil, message.MsgItemDeletedSuccess)
 }
