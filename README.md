@@ -11,7 +11,7 @@ Designed for scalability, maintainability, and clean architecture.
 ## Getting Started
 
 ```bash
-git clone https://github.com/ech0py/lalan-be.git
+git clone https://github.com/braiyenmassora/lalan-be.git
 cd lalan-be
 go mod download
 ```
