@@ -7,8 +7,8 @@ import (
 )
 
 /*
-Struct untuk struktur respons API.
-Merepresentasikan data respons JSON.
+Merepresentasikan struktur respons API.
+Digunakan untuk encoding JSON dengan field kode, data, pesan, dan status sukses.
 */
 type Response struct {
 	Code    int    `json:"code"`
@@ -18,8 +18,8 @@ type Response struct {
 }
 
 /*
-Mengirim respons JSON sukses.
-Mengatur header dan mengencode respons.
+Mengirim respons sukses.
+Mengembalikan respons JSON dengan data dan pesan sukses.
 */
 func Success(w http.ResponseWriter, code int, data any, message string) {
 	w.Header().Set("Content-Type", "application/json")
@@ -33,8 +33,8 @@ func Success(w http.ResponseWriter, code int, data any, message string) {
 }
 
 /*
-Mengirim respons JSON error.
-Mengatur header dan mengencode respons.
+Mengirim respons error.
+Mengembalikan respons JSON dengan pesan error.
 */
 func Error(w http.ResponseWriter, code int, message string) {
 	w.Header().Set("Content-Type", "application/json")
@@ -47,32 +47,32 @@ func Error(w http.ResponseWriter, code int, message string) {
 }
 
 /*
-Mengirim respons OK dengan data.
-Menggunakan fungsi Success dengan status OK.
+Mengirim respons OK.
+Mengembalikan respons JSON dengan status OK dan data.
 */
 func OK(w http.ResponseWriter, data any, msg string) {
 	Success(w, http.StatusOK, data, msg)
 }
 
 /*
-Mengirim respons Created dengan data.
-Menggunakan fungsi Success dengan status Created.
+Mengirim respons Created.
+Mengembalikan respons JSON dengan status Created dan data.
 */
 func Created(w http.ResponseWriter, data any, msg string) {
 	Success(w, http.StatusCreated, data, msg)
 }
 
 /*
-Mengirim respons BadRequest dengan pesan.
-Menggunakan fungsi Error dengan status BadRequest.
+Mengirim respons BadRequest.
+Mengembalikan respons JSON dengan status BadRequest dan pesan.
 */
 func BadRequest(w http.ResponseWriter, msg string) {
 	Error(w, http.StatusBadRequest, msg)
 }
 
 /*
-Mengirim respons Unauthorized dengan pesan.
-Menggunakan fungsi Error dengan status Unauthorized.
+Mengirim respons Unauthorized.
+Mengembalikan respons JSON dengan status Unauthorized dan pesan.
 */
 func Unauthorized(w http.ResponseWriter, msg string) {
 	Error(w, http.StatusUnauthorized, msg)

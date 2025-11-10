@@ -1,5 +1,6 @@
 /*
-Membuat tabel categories untuk menyimpan data kategori.
+Membuat tabel untuk menyimpan data kategori.
+Menghasilkan struktur tabel dengan kolom id, name, description, dan timestamp.
 */
 CREATE TABLE categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -10,17 +11,20 @@ CREATE TABLE categories (
 );
 
 /*
-Membuat index pada kolom name untuk meningkatkan performa pencarian.
+Membuat index pada kolom name.
+Meningkatkan performa query pencarian berdasarkan nama.
 */
 CREATE INDEX idx_categories_name ON categories(name);
 
 /*
-Membuat index pada kolom created_at untuk meningkatkan performa pencarian.
+Membuat index pada kolom created_at.
+Meningkatkan performa query pengurutan berdasarkan waktu pembuatan.
 */
 CREATE INDEX idx_categories_created_at ON categories(created_at);
 
 /*
-Fungsi untuk memperbarui kolom updated_at secara otomatis.
+Membuat fungsi untuk update otomatis kolom updated_at.
+Mengembalikan baris yang diperbarui dengan timestamp baru.
 */
 CREATE OR REPLACE FUNCTION update_categories_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -31,7 +35,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 /*
-Trigger untuk memanggil fungsi update updated_at sebelum update.
+Membuat trigger untuk memanggil fungsi update sebelum perubahan.
+Memastikan kolom updated_at selalu diperbarui saat update.
 */
 CREATE TRIGGER update_categories_updated_at
 BEFORE UPDATE ON categories

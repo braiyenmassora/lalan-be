@@ -2,7 +2,10 @@ package model
 
 import "time"
 
-/* CategoryModel merepresentasikan struktur data untuk kategori. */
+/*
+Merepresentasikan data kategori.
+Digunakan untuk mapping JSON dan database dengan field ID, nama, deskripsi, dan timestamp.
+*/
 type CategoryModel struct {
 	ID          string    `json:"id" db:"id"`
 	Name        string    `json:"name" db:"name"`

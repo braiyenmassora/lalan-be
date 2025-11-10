@@ -11,10 +11,11 @@ import (
 )
 
 /*
-ItemService mendefinisikan operasi untuk layanan item.
+Mendefinisikan operasi service item.
+Menyediakan method untuk menambah, ambil semua, ambil by ID, ambil by user, update, dan hapus item dengan hasil sukses atau error.
 */
 type ItemService interface {
-	AddItem(input *model.ItemModel) (*model.ItemModel, error)
+	AddItem(userID string, input *model.ItemModel) (*model.ItemModel, error)
 	GetAllItems() ([]*model.ItemModel, error)
 	GetItemByID(id string) (*model.ItemModel, error)
 	GetItemsByUserID(userID string) ([]*model.ItemModel, error)
@@ -23,31 +24,32 @@ type ItemService interface {
 }
 
 /*
-itemService mengimplementasikan ItemService.
+Implementasi service item dengan repository.
 */
 type itemService struct {
 	repo repository.ItemRepository
 }
 
 /*
-NewItemService membuat instance ItemService dengan repository.
+Membuat service item.
+Mengembalikan instance ItemService yang siap digunakan.
 */
 func NewItemService(repo repository.ItemRepository) ItemService {
 	return &itemService{repo: repo}
 }
 
 /*
-AddItem menambahkan item baru.
-Mengembalikan model atau error.
+Menambahkan item baru.
+Mengembalikan data item yang dibuat atau error jika validasi/gagal.
 */
-func (s *itemService) AddItem(input *model.ItemModel) (*model.ItemModel, error) {
+func (s *itemService) AddItem(userID string, input *model.ItemModel) (*model.ItemModel, error) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
 
 	if input.Name == "" {
 		return nil, errors.New(message.MsgItemNameRequired)
 	}
-	if input.UserID == "" {
+	if userID == "" {
 		return nil, errors.New(message.MsgUserIDRequired)
 	}
 	if input.CategoryID == "" {
@@ -63,7 +65,7 @@ func (s *itemService) AddItem(input *model.ItemModel) (*model.ItemModel, error) 
 		return nil, errors.New(message.MsgItemDepositInvalid)
 	}
 
-	existing, err := s.repo.FindItemNameByUserID(input.Name, input.UserID)
+	existing, err := s.repo.FindItemNameByUserID(input.Name, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +74,7 @@ func (s *itemService) AddItem(input *model.ItemModel) (*model.ItemModel, error) 
 	}
 
 	input.ID = uuid.New().String()
+	input.UserID = userID
 
 	if err := s.repo.CreateItem(input); err != nil {
 		return nil, err
@@ -81,16 +84,16 @@ func (s *itemService) AddItem(input *model.ItemModel) (*model.ItemModel, error) 
 }
 
 /*
-GetAllItems mendapatkan semua item.
-Mengembalikan slice model atau error.
+Mengambil semua item.
+Mengembalikan daftar item atau error jika gagal.
 */
 func (s *itemService) GetAllItems() ([]*model.ItemModel, error) {
 	return s.repo.FindAll()
 }
 
 /*
-GetItemByID mendapatkan item berdasarkan ID.
-Mengembalikan model atau error.
+Mengambil item berdasarkan ID.
+Mengembalikan data item atau error jika tidak ditemukan.
 */
 func (s *itemService) GetItemByID(id string) (*model.ItemModel, error) {
 	if id == "" {
@@ -109,8 +112,8 @@ func (s *itemService) GetItemByID(id string) (*model.ItemModel, error) {
 }
 
 /*
-GetItemsByUserID mendapatkan semua item berdasarkan user ID.
-Mengembalikan slice model atau error.
+Mengambil item berdasarkan user ID.
+Mengembalikan daftar item user atau error jika gagal.
 */
 func (s *itemService) GetItemsByUserID(userID string) ([]*model.ItemModel, error) {
 	if userID == "" {
@@ -121,8 +124,8 @@ func (s *itemService) GetItemsByUserID(userID string) ([]*model.ItemModel, error
 }
 
 /*
-UpdateItem mengupdate item berdasarkan ID dan user ID.
-Mengembalikan model atau error.
+Mengupdate item.
+Mengembalikan data item yang diupdate atau error jika validasi/not found/unauthorized/gagal.
 */
 func (s *itemService) UpdateItem(id string, userID string, input *model.ItemModel) (*model.ItemModel, error) {
 	if id == "" {
@@ -182,8 +185,8 @@ func (s *itemService) UpdateItem(id string, userID string, input *model.ItemMode
 }
 
 /*
-DeleteItem menghapus item berdasarkan ID dan user ID.
-Mengembalikan error.
+Menghapus item berdasarkan ID dan user ID.
+Mengembalikan error jika validasi/not found/unauthorized/gagal.
 */
 func (s *itemService) DeleteItem(id string, userID string) error {
 	if id == "" {

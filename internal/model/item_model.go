@@ -2,15 +2,20 @@ package model
 
 import "time"
 
-/* PickupMethod mendefinisikan jenis metode pengambilan item. */
-type PickupMethod string
-
 const (
 	PickupMethodSelfPickup PickupMethod = "pickup"
 	PickupMethodDelivery   PickupMethod = "delivery"
 )
 
-/* ItemModel merepresentasikan struktur data untuk item. */
+/*
+Mendefinisikan metode pengambilan item.
+*/
+type PickupMethod string
+
+/*
+Merepresentasikan data item.
+Digunakan untuk mapping JSON dan database dengan field detail, harga, dan relasi.
+*/
 type ItemModel struct {
 	ID          string       `json:"id" db:"id"`
 	Name        string       `json:"name" db:"name"`

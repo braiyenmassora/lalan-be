@@ -3,8 +3,8 @@ package model
 import "time"
 
 /*
-Struct untuk merepresentasikan data hoster.
-Digunakan untuk mapping data dari database dan JSON.
+Merepresentasikan data hoster.
+Digunakan untuk mapping JSON dan database dengan field pribadi, toko, dan kontak.
 */
 type HosterModel struct {
 	ID           string    `json:"id" db:"id"`

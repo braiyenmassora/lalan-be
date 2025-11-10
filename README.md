@@ -21,15 +21,18 @@ go mod download
 Set up the `.env.dev` file before running the application:
 
 ```bash
-# PostgreSQL database connection (development)
-DATABASE_URL='postgres://<USERNAME>:<PASSWORD>@<HOST>:<PORT>/<DB_NAME>?sslmode=require&search_path={schema_name}'
+# PostgreSQL database connection components (development)
+DB_USER=<your_db_username>
+DB_PASSWORD=<your_db_password>
+DB_HOST=<your_db_host>
+DB_PORT=<your_db_port>
+DB_NAME=<your_db_name>
 
-# JWT Secret Key openssl rand -base64 32
+# JWT Secret Key (generate with: openssl rand -base64 32)
 JWT_SECRET=<your_secret_key>
 
 # Application Port
 APP_PORT=8080
-
 ```
 
 ## Project Structure
@@ -53,7 +56,7 @@ lalan-be/
 └── go.sum                  # Go module checksums
 ```
 
-## Development Setup
+## Run Locally
 
 ### Install Air (Live Reload)
 
@@ -77,47 +80,6 @@ go build -o main ./cmd/main.go
 ./main
 ```
 
-## API Documentation
-
-### Authentication Flow
-
-```http
-POST /v1/auth/register   # Register a new account
-POST /v1/auth/login      # Login with existing credentials
-```
-
-### API Endpoints
-
-#### Authentication
-
-| Endpoint              | Method | Access   |
-|-----------------------|--------|----------|
-| `/v1/auth/register`   | POST   | Public   |
-| `/v1/auth/login`      | POST   | Public   |
-
-#### Category
-
-| Endpoint                      | Method | Access    |
-|-------------------------------|--------|-----------|
-| `/v1/category/list`           | GET    | Public    |
-| `/v1/category/detail?id={id}` | GET    | Public    |
-| `/v1/category/add`            | POST   | Protected |
-| `/v1/category/update?id={id}` | PUT    | Protected |
-| `/v1/category/delete?id={id}` | DELETE | Protected |
-
-#### Item
-
-| Endpoint                   | Method | Access    |
-|-----------------------------|--------|-----------|
-| `/v1/item/list`             | GET    | Public    |
-| `/v1/item/detail?id={id}`   | GET    | Public    |
-| `/v1/item/my-items`         | GET    | Protected |
-| `/v1/item/add`              | POST   | Protected |
-| `/v1/item/update?id={id}`   | PUT    | Protected |
-| `/v1/item/delete?id={id}`   | DELETE | Protected |
-
----
-
 ## Adding New Features
 
 | Component  | Description                              | Location               |
@@ -134,11 +96,11 @@ POST /v1/auth/login      # Login with existing credentials
 
 ## Code Commenting Guidelines
 
-```bash
-{
-  "initial": "Review the entire codebase to understand its purpose before adding comments.",
-  "after": "Remove outdated or unnecessary comments to maintain a clean and consistent codebase.",
-  "new": "Organize code sections according to Golang best practices, then add concise technical comments written in Indonesian for each function, method, constant, struct, or significant part of the code. Use block comment format /* ... */. Split long comments into multiple lines for readability. Focus comments on explaining purpose and expected outcomes, avoid restating obvious implementation details. Ensure consistency and clarity in all comments throughout the project."
-}
-
 ```
+{
+  "initial": "Analyze this file to grasp its role.",
+  "after": "Delete any comment that restates code or is outdated.",
+  "new": "Reorder per Go layout: const → var → init → types → funcs. Add /* ... */ block comments in Indonesian, ≤2 lines each. Cover only purpose + expected outcome. Zero implementation echo. Uniform style."
+}
+```
+  

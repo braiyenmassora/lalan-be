@@ -17,9 +17,8 @@ import (
 )
 
 /*
-AuthResponse merepresentasikan struktur respons autentikasi.
-Berisi ID pengguna, token akses, token refresh, tipe token, dan waktu kedaluwarsa.
-Digunakan untuk operasi registrasi dan login yang berhasil.
+Merepresentasikan respons autentikasi.
+Digunakan untuk mengembalikan ID, token akses, refresh, tipe, dan kedaluwarsa setelah registrasi/login sukses.
 */
 type AuthResponse struct {
 	ID           string `json:"id"`
@@ -30,8 +29,8 @@ type AuthResponse struct {
 }
 
 /*
-AuthService mendefinisikan interface untuk operasi terkait autentikasi.
-Meliputi method untuk registrasi pengguna, login, dan pengambilan profil.
+Mendefinisikan operasi service autentikasi.
+Menyediakan method untuk registrasi, login, dan ambil profil dengan hasil sukses atau error.
 */
 type AuthService interface {
 	Register(input *model.HosterModel) (*AuthResponse, error)
@@ -40,24 +39,23 @@ type AuthService interface {
 }
 
 /*
-authService adalah implementasi dari AuthService.
-Menggunakan repository untuk berinteraksi dengan database dalam tugas autentikasi.
+Implementasi service autentikasi dengan repository.
 */
 type authService struct {
 	repo repository.AuthRepository
 }
 
 /*
-NewAuthService membuat instance baru AuthService dengan repository yang diberikan.
-Mengembalikan implementasi interface AuthService.
+Membuat service autentikasi.
+Mengembalikan instance AuthService yang siap digunakan.
 */
 func NewAuthService(repo repository.AuthRepository) AuthService {
 	return &authService{repo: repo}
 }
 
 /*
-generateToken membuat token JWT akses dan refresh untuk ID pengguna tertentu.
-Mengembalikan AuthResponse dengan detail token atau error jika pembuatan token gagal.
+Menghasilkan token JWT.
+Mengembalikan AuthResponse dengan token akses dan refresh atau error jika gagal.
 */
 func (s *authService) generateToken(userID string) (*AuthResponse, error) {
 	// Access Token (1 jam)
@@ -87,9 +85,8 @@ func (s *authService) generateToken(userID string) (*AuthResponse, error) {
 }
 
 /*
-Register menangani registrasi hoster baru.
-Melakukan hash password, menyimpan pengguna ke database, dan menghasilkan token.
-Mengembalikan AuthResponse jika berhasil atau error jika registrasi gagal.
+Mendaftarkan hoster baru.
+Mengembalikan AuthResponse dengan token atau error jika registrasi gagal.
 */
 func (s *authService) Register(input *model.HosterModel) (*AuthResponse, error) {
 	// Generate UUID untuk ID
@@ -113,9 +110,8 @@ func (s *authService) Register(input *model.HosterModel) (*AuthResponse, error) 
 }
 
 /*
-Login memvalidasi kredensial pengguna dan menghasilkan token autentikasi.
-Memeriksa email dan password terhadap database.
-Mengembalikan AuthResponse jika berhasil atau error untuk kredensial tidak valid.
+Memproses login hoster.
+Mengembalikan AuthResponse dengan token atau error jika kredensial salah.
 */
 func (s *authService) Login(email, password string) (*AuthResponse, error) {
 	hoster, err := s.repo.FindByEmailForLogin(email)
@@ -131,8 +127,8 @@ func (s *authService) Login(email, password string) (*AuthResponse, error) {
 }
 
 /*
-GetHosterProfile mengambil profil hoster berdasarkan ID pengguna.
-Mengambil data dari repository dan mengembalikan model hoster atau error.
+Mengambil profil hoster.
+Mengembalikan data hoster atau error jika tidak ditemukan.
 */
 func (s *authService) GetHosterProfile(userID string) (*model.HosterModel, error) {
 	log.Printf("get prodile userid: %s", userID)

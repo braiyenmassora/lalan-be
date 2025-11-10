@@ -12,17 +12,18 @@ import (
 )
 
 /*
-Tipe untuk key context.
-*/
-type contextKey string
-
-/*
-Konstanta key untuk user ID di context.
+Key untuk menyimpan user ID di context.
 */
 const UserIDKey contextKey = "user_id"
 
 /*
-Middleware untuk validasi JWT dan menambahkan user ID ke context.
+Tipe key untuk context.
+*/
+type contextKey string
+
+/*
+Memvalidasi JWT dan menambahkan user ID ke context.
+Melanjutkan ke handler berikutnya jika valid, atau mengembalikan error jika tidak.
 */
 func JWTMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +66,7 @@ func JWTMiddleware(next http.Handler) http.Handler {
 
 /*
 Mengambil user ID dari context request.
+Mengembalikan string user ID jika ada, atau kosong jika tidak.
 */
 func GetUserID(r *http.Request) string {
 	if id, ok := r.Context().Value(UserIDKey).(string); ok {

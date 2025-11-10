@@ -10,10 +10,9 @@ import (
 )
 
 /*
-Interface untuk operasi autentikasi hoster.
-Mendefinisikan method untuk membuat dan mengambil data hoster.
+Mendefinisikan operasi repository untuk autentikasi hoster.
+Menyediakan method untuk membuat dan mengambil data hoster dengan hasil sukses atau error.
 */
-
 type AuthRepository interface {
 	CreateHoster(hoster *model.HosterModel) error
 	FindByEmail(email string) (*model.HosterModel, error)
@@ -22,24 +21,23 @@ type AuthRepository interface {
 }
 
 /*
-Struct untuk menyimpan koneksi database.
-Digunakan sebagai implementasi interface AuthRepository.
+Implementasi repository autentikasi dengan koneksi database.
 */
 type authRepository struct {
 	db *sqlx.DB
 }
 
 /*
-Membuat instance repository dengan koneksi database.
-Mengembalikan interface AuthRepository.
+Membuat repository autentikasi.
+Mengembalikan instance AuthRepository yang siap digunakan.
 */
 func NewAuthRepository(db *sqlx.DB) AuthRepository {
 	return &authRepository{db: db}
 }
 
 /*
-Menyisipkan data hoster ke tabel hosters.
-Mengembalikan error jika gagal.
+Membuat hoster baru di database.
+Mengembalikan error jika penyisipan gagal.
 */
 func (r *authRepository) CreateHoster(h *model.HosterModel) error {
 	query := `
@@ -58,8 +56,8 @@ func (r *authRepository) CreateHoster(h *model.HosterModel) error {
 }
 
 /*
-Mengambil data hoster lengkap dari tabel hosters berdasarkan email.
-Mengembalikan pointer ke model dan error; (nil, nil) jika tidak ada baris.
+Mengambil hoster berdasarkan email.
+Mengembalikan data hoster atau nil jika tidak ditemukan.
 */
 func (r *authRepository) FindByEmail(email string) (*model.HosterModel, error) {
 	var hoster model.HosterModel
@@ -76,8 +74,8 @@ func (r *authRepository) FindByEmail(email string) (*model.HosterModel, error) {
 }
 
 /*
-Mengambil data hoster untuk autentikasi dari tabel hosters berdasarkan email.
-Mengembalikan pointer ke model dan error; (nil, nil) jika tidak ada baris.
+Mengambil hoster untuk login berdasarkan email.
+Mengembalikan data hoster lengkap atau nil jika tidak ditemukan.
 */
 func (r *authRepository) FindByEmailForLogin(email string) (*model.HosterModel, error) {
 	var h model.HosterModel
@@ -120,9 +118,8 @@ func (r *authRepository) FindByEmailForLogin(email string) (*model.HosterModel, 
 }
 
 /*
-Mengambil data hoster lengkap dari tabel hosters berdasarkan ID.
-Mengembalikan pointer ke model dan error; (nil, nil) jika tidak ada baris.
-Tidak mengembalikan password_hash untuk keamanan.
+Mengambil hoster berdasarkan ID.
+Mengembalikan data hoster tanpa password atau nil jika tidak ditemukan.
 */
 func (r *authRepository) GetHosterByID(id string) (*model.HosterModel, error) {
 	var hoster model.HosterModel

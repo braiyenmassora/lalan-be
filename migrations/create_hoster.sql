@@ -1,13 +1,9 @@
 /*
-Mengaktifkan ekstensi UUID untuk menghasilkan UUID.
-*/
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
-/*
-Membuat tabel hosters untuk menyimpan data hoster.
+Membuat tabel untuk menyimpan data hoster.
+Menghasilkan struktur tabel dengan kolom pribadi, toko, kontak, dan timestamp.
 */
 CREATE TABLE hosters (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     full_name VARCHAR(255) NOT NULL,
     profile_photo VARCHAR(500),
     store_name VARCHAR(255) NOT NULL,
@@ -24,17 +20,20 @@ CREATE TABLE hosters (
 );
 
 /*
-Membuat index pada kolom email untuk meningkatkan performa pencarian.
+Membuat index pada kolom email.
+Meningkatkan performa query pencarian berdasarkan email.
 */
 CREATE INDEX idx_hosters_email ON hosters(email);
 
 /*
-Membuat index pada kolom created_at untuk meningkatkan performa pencarian.
+Membuat index pada kolom created_at.
+Meningkatkan performa query pengurutan berdasarkan waktu pembuatan.
 */
 CREATE INDEX idx_hosters_created_at ON hosters(created_at);
 
 /*
-Fungsi untuk memperbarui kolom updated_at secara otomatis.
+Membuat fungsi untuk update otomatis kolom updated_at.
+Mengembalikan baris yang diperbarui dengan timestamp baru.
 */
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -42,9 +41,13 @@ BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
 /*
-Trigger untuk memanggil fungsi update updated_at sebelum update.
+Membuat trigger untuk memanggil fungsi update sebelum perubahan.
+Memastikan kolom updated_at selalu diperbarui saat update.
 */
-CREATE TRIGGER update_hosters_updated_at BEFORE UPDATE ON hosters FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_hosters_updated_at
+BEFORE UPDATE ON hosters
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();

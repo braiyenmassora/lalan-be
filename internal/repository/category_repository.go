@@ -9,7 +9,8 @@ import (
 )
 
 /*
-CategoryRepository mendefinisikan operasi untuk mengelola data kategori di database.
+Mendefinisikan operasi repository untuk kategori.
+Menyediakan method untuk mencari, membuat, update, dan hapus kategori dengan hasil sukses atau error.
 */
 type CategoryRepository interface {
 	FindCategoryName(name string) (*model.CategoryModel, error)
@@ -21,23 +22,23 @@ type CategoryRepository interface {
 }
 
 /*
-categoryRepository menyimpan koneksi database untuk operasi repository kategori.
+Implementasi repository kategori dengan koneksi database.
 */
 type categoryRepository struct {
 	db *sqlx.DB
 }
 
 /*
-NewCategoryRepository membuat instance CategoryRepository dengan koneksi database.
-Mengembalikan interface CategoryRepository.
+Membuat repository kategori.
+Mengembalikan instance CategoryRepository yang siap digunakan.
 */
 func NewCategoryRepository(db *sqlx.DB) CategoryRepository {
 	return &categoryRepository{db: db}
 }
 
 /*
-FindCategoryName mencari kategori berdasarkan nama di tabel categories.
-Mengembalikan pointer ke model dan error; (nil, nil) jika tidak ditemukan.
+Mencari kategori berdasarkan nama.
+Mengembalikan data kategori atau nil jika tidak ditemukan.
 */
 func (r *categoryRepository) FindCategoryName(name string) (*model.CategoryModel, error) {
 	query := "SELECT id, name, description, created_at, updated_at FROM categories WHERE name = $1 LIMIT 1"
@@ -54,8 +55,8 @@ func (r *categoryRepository) FindCategoryName(name string) (*model.CategoryModel
 }
 
 /*
-CreateCategory menyisipkan kategori baru ke tabel categories.
-Mengembalikan error jika gagal.
+Membuat kategori baru di database.
+Mengembalikan error jika penyisipan gagal.
 */
 func (r *categoryRepository) CreateCategory(category *model.CategoryModel) error {
 	query := `INSERT INTO categories (id, name, description, created_at, updated_at) 
@@ -69,8 +70,8 @@ func (r *categoryRepository) CreateCategory(category *model.CategoryModel) error
 }
 
 /*
-FindAll mengambil semua kategori dari tabel categories dalam urutan descending.
-Mengembalikan slice pointer ke model dan error jika gagal.
+Mengambil semua kategori.
+Mengembalikan daftar kategori atau error jika gagal.
 */
 func (r *categoryRepository) FindAll() ([]*model.CategoryModel, error) {
 	query := "SELECT id, name, description, created_at, updated_at FROM categories ORDER BY created_at DESC"
@@ -84,8 +85,8 @@ func (r *categoryRepository) FindAll() ([]*model.CategoryModel, error) {
 }
 
 /*
-FindByID mencari kategori berdasarkan ID di tabel categories.
-Mengembalikan pointer ke model dan error; (nil, nil) jika tidak ditemukan.
+Mencari kategori berdasarkan ID.
+Mengembalikan data kategori atau nil jika tidak ditemukan.
 */
 func (r *categoryRepository) FindByID(id string) (*model.CategoryModel, error) {
 	query := "SELECT id, name, description, created_at, updated_at FROM categories WHERE id = $1 LIMIT 1"
@@ -102,8 +103,8 @@ func (r *categoryRepository) FindByID(id string) (*model.CategoryModel, error) {
 }
 
 /*
-Update memperbarui data kategori di tabel categories berdasarkan ID.
-Mengembalikan error jika gagal atau tidak ada baris yang terpengaruh.
+Memperbarui kategori.
+Mengembalikan error jika update gagal atau tidak ada baris terpengaruh.
 */
 func (r *categoryRepository) Update(category *model.CategoryModel) error {
 	query := `UPDATE categories 
@@ -129,8 +130,8 @@ func (r *categoryRepository) Update(category *model.CategoryModel) error {
 }
 
 /*
-Delete menghapus kategori dari tabel categories berdasarkan ID.
-Mengembalikan error jika gagal atau tidak ada baris yang terpengaruh.
+Menghapus kategori berdasarkan ID.
+Mengembalikan error jika penghapusan gagal atau tidak ada baris terpengaruh.
 */
 func (r *categoryRepository) Delete(id string) error {
 	query := "DELETE FROM categories WHERE id = $1"

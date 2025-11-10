@@ -7,7 +7,8 @@ import (
 )
 
 /*
-ItemRoutes mendaftarkan route untuk item.
+Mendaftarkan route item.
+Menyiapkan endpoint untuk menambah, update, hapus, my-items (terproteksi) dan list/detail (publik).
 */
 func ItemRoutes(h *handler.ItemHandler) {
 	v1 := "/v1/item"

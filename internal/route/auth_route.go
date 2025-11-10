@@ -9,8 +9,8 @@ import (
 )
 
 /*
-AuthRoutes mendaftarkan route untuk operasi autentikasi.
-Menyiapkan endpoint untuk registrasi, login, pengambilan profil, dan endpoint test terproteksi.
+Mendaftarkan route autentikasi.
+Menyiapkan endpoint untuk registrasi, login, profil, dan test terproteksi dengan middleware JWT.
 */
 func AuthRoutes(h *handler.AuthHandler) {
 	v1 := "/v1"

@@ -12,23 +12,16 @@ import (
 )
 
 /*
-Struct untuk menangani request autentikasi.
-Mengandung service untuk operasi bisnis.
+Menangani autentikasi hoster.
+Menyediakan operasi registrasi, login, dan pengambilan profil dengan respons sukses atau error.
 */
 type AuthHandler struct {
 	service service.AuthService
 }
 
 /*
-Membuat instance handler dengan service autentikasi.
-Mengembalikan pointer ke AuthHandler.
-*/
-func NewAuthHandler(s service.AuthService) *AuthHandler {
-	return &AuthHandler{service: s}
-}
-
-/*
-Struct untuk merepresentasikan request registrasi hoster.
+Merepresentasikan data registrasi hoster.
+Digunakan untuk decoding request JSON dan mapping ke model.
 */
 type RegisterRequest struct {
 	FullName     string `json:"full_name"`
@@ -45,8 +38,16 @@ type RegisterRequest struct {
 }
 
 /*
-Menangani request registrasi hoster.
-Mengembalikan respons sukses atau error.
+Membuat handler autentikasi.
+Mengembalikan instance AuthHandler yang siap digunakan.
+*/
+func NewAuthHandler(s service.AuthService) *AuthHandler {
+	return &AuthHandler{service: s}
+}
+
+/*
+Memproses registrasi hoster.
+Mengembalikan respons pembuatan akun sukses atau error validasi.
 */
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -84,8 +85,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
-Menangani request login hoster.
-Mengembalikan respons sukses atau error.
+Memproses login hoster.
+Mengembalikan token autentikasi sukses atau error kredensial.
 */
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -113,8 +114,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
-Menangani request get profile hoster.
-Mengembalikan data profile hoster jika token valid.
+Mengambil profil hoster.
+Mengembalikan data profil jika autentikasi valid atau error jika tidak ditemukan.
 */
 func (h *AuthHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -142,8 +143,8 @@ func (h *AuthHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
-Menangani request test endpoint terproteksi.
-Mengembalikan informasi user jika token valid.
+Menguji endpoint terproteksi.
+Mengembalikan konfirmasi token valid dengan ID user atau error autentikasi.
 */
 func (h *AuthHandler) TestProtected(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)

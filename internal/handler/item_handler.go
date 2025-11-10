@@ -11,17 +11,18 @@ import (
 	"strings"
 )
 
-/* ItemHandler menangani request HTTP untuk item. */
+/*
+Menangani operasi item.
+Menyediakan endpoint untuk menambah, mengambil, update, dan hapus item dengan autentikasi dan respons sukses atau error.
+*/
 type ItemHandler struct {
 	service service.ItemService
 }
 
-/* NewItemHandler membuat instance ItemHandler dengan service. */
-func NewItemHandler(s service.ItemService) *ItemHandler {
-	return &ItemHandler{service: s}
-}
-
-/* ItemRequest merepresentasikan struktur request untuk item. */
+/*
+Merepresentasikan data request item.
+Digunakan untuk decoding JSON dan validasi input.
+*/
 type ItemRequest struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
@@ -34,7 +35,18 @@ type ItemRequest struct {
 	CategoryID  string   `json:"category_id"`
 }
 
-/* AddItem menangani request untuk menambahkan item. */
+/*
+Membuat handler item.
+Mengembalikan instance ItemHandler yang siap digunakan.
+*/
+func NewItemHandler(s service.ItemService) *ItemHandler {
+	return &ItemHandler{service: s}
+}
+
+/*
+Menambahkan item baru.
+Mengembalikan respons pembuatan sukses atau error validasi/autentikasi.
+*/
 func (h *ItemHandler) AddItem(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -84,10 +96,9 @@ func (h *ItemHandler) AddItem(w http.ResponseWriter, r *http.Request) {
 		Deposit:     req.Deposit,
 		Discount:    req.Discount,
 		CategoryID:  req.CategoryID,
-		UserID:      userID,
 	}
 
-	itemResp, err := h.service.AddItem(input)
+	itemResp, err := h.service.AddItem(userID, input)
 	if err != nil {
 		response.BadRequest(w, err.Error())
 		return
@@ -96,7 +107,10 @@ func (h *ItemHandler) AddItem(w http.ResponseWriter, r *http.Request) {
 	response.Created(w, itemResp, message.MsgItemCreatedSuccess)
 }
 
-/* GetAllItems menangani request untuk mendapatkan semua item. */
+/*
+Mengambil semua item.
+Mengembalikan daftar item sukses atau error.
+*/
 func (h *ItemHandler) GetAllItems(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -112,7 +126,10 @@ func (h *ItemHandler) GetAllItems(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, items, message.MsgSuccess)
 }
 
-/* GetItemByID menangani request untuk mendapatkan item berdasarkan ID. */
+/*
+Mengambil item berdasarkan ID.
+Mengembalikan data item sukses atau error jika tidak ditemukan.
+*/
 func (h *ItemHandler) GetItemByID(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -139,7 +156,10 @@ func (h *ItemHandler) GetItemByID(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, item, message.MsgSuccess)
 }
 
-/* GetMyItems menangani request untuk mendapatkan item milik user. */
+/*
+Mengambil item milik user.
+Mengembalikan daftar item user sukses atau error autentikasi.
+*/
 func (h *ItemHandler) GetMyItems(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -162,7 +182,10 @@ func (h *ItemHandler) GetMyItems(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, items, message.MsgSuccess)
 }
 
-/* UpdateItem menangani request untuk mengupdate item. */
+/*
+Mengupdate item.
+Mengembalikan respons update sukses atau error validasi/not found/autentikasi.
+*/
 func (h *ItemHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		response.BadRequest(w, message.MsgNotAllowed)
@@ -236,7 +259,10 @@ func (h *ItemHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, itemResp, message.MsgItemUpdatedSuccess)
 }
 
-/* DeleteItem menangani request untuk menghapus item. */
+/*
+Menghapus item.
+Mengembalikan respons penghapusan sukses atau error jika tidak ditemukan/autentikasi.
+*/
 func (h *ItemHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		response.BadRequest(w, message.MsgNotAllowed)

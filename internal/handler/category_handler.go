@@ -11,21 +11,16 @@ import (
 )
 
 /*
-CategoryHandler menangani request HTTP untuk kategori.
+Menangani operasi kategori.
+Menyediakan endpoint untuk menambah, mengambil, update, dan hapus kategori dengan respons sukses atau error.
 */
 type CategoryHandler struct {
 	service service.CategoryService
 }
 
 /*
-NewCategoryHandler membuat instance CategoryHandler dengan service.
-*/
-func NewCategoryHandler(s service.CategoryService) *CategoryHandler {
-	return &CategoryHandler{service: s}
-}
-
-/*
-CategoryRequest merepresentasikan struktur request untuk kategori.
+Merepresentasikan data request kategori.
+Digunakan untuk decoding JSON dan validasi input.
 */
 type CategoryRequest struct {
 	Name        string `json:"name"`
@@ -33,8 +28,16 @@ type CategoryRequest struct {
 }
 
 /*
-AddCategory menangani request untuk menambahkan kategori.
-Mengembalikan respons sukses atau error.
+Membuat handler kategori.
+Mengembalikan instance CategoryHandler yang siap digunakan.
+*/
+func NewCategoryHandler(s service.CategoryService) *CategoryHandler {
+	return &CategoryHandler{service: s}
+}
+
+/*
+Menambahkan kategori baru.
+Mengembalikan respons pembuatan sukses atau error validasi.
 */
 func (h *CategoryHandler) AddCategory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -76,8 +79,8 @@ func (h *CategoryHandler) AddCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
-GetAllCategories menangani request untuk mendapatkan semua kategori.
-Mengembalikan respons sukses atau error.
+Mengambil semua kategori.
+Mengembalikan daftar kategori sukses atau error.
 */
 func (h *CategoryHandler) GetAllCategories(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -95,8 +98,8 @@ func (h *CategoryHandler) GetAllCategories(w http.ResponseWriter, r *http.Reques
 }
 
 /*
-GetCategoryByID menangani request untuk mendapatkan kategori berdasarkan ID.
-Mengembalikan respons sukses atau error.
+Mengambil kategori berdasarkan ID.
+Mengembalikan data kategori sukses atau error jika tidak ditemukan.
 */
 func (h *CategoryHandler) GetCategoryByID(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -125,8 +128,8 @@ func (h *CategoryHandler) GetCategoryByID(w http.ResponseWriter, r *http.Request
 }
 
 /*
-UpdateCategory menangani request untuk mengupdate kategori.
-Mengembalikan respons sukses atau error.
+Mengupdate kategori.
+Mengembalikan respons update sukses atau error validasi/not found.
 */
 func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
@@ -179,8 +182,8 @@ func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request)
 }
 
 /*
-DeleteCategory menangani request untuk menghapus kategori.
-Mengembalikan respons sukses atau error.
+Menghapus kategori.
+Mengembalikan respons penghapusan sukses atau error jika tidak ditemukan.
 */
 func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {

@@ -11,7 +11,8 @@ import (
 )
 
 /*
-CategoryService mendefinisikan operasi untuk layanan kategori.
+Mendefinisikan operasi service kategori.
+Menyediakan method untuk menambah, ambil semua, ambil by ID, update, dan hapus kategori dengan hasil sukses atau error.
 */
 type CategoryService interface {
 	AddCategory(input *model.CategoryModel) (*model.CategoryModel, error)
@@ -22,22 +23,23 @@ type CategoryService interface {
 }
 
 /*
-categoryService mengimplementasikan CategoryService.
+Implementasi service kategori dengan repository.
 */
 type categoryService struct {
 	repo repository.CategoryRepository
 }
 
 /*
-NewCategoryService membuat instance CategoryService dengan repository.
+Membuat service kategori.
+Mengembalikan instance CategoryService yang siap digunakan.
 */
 func NewCategoryService(repo repository.CategoryRepository) CategoryService {
 	return &categoryService{repo: repo}
 }
 
 /*
-AddCategory menambahkan kategori baru.
-Mengembalikan model atau error.
+Menambahkan kategori baru.
+Mengembalikan data kategori yang dibuat atau error jika validasi/gagal.
 */
 func (s *categoryService) AddCategory(input *model.CategoryModel) (*model.CategoryModel, error) {
 	// Validasi input
@@ -70,16 +72,16 @@ func (s *categoryService) AddCategory(input *model.CategoryModel) (*model.Catego
 }
 
 /*
-GetAllCategories mendapatkan semua kategori.
-Mengembalikan slice model atau error.
+Mengambil semua kategori.
+Mengembalikan daftar kategori atau error jika gagal.
 */
 func (s *categoryService) GetAllCategories() ([]*model.CategoryModel, error) {
 	return s.repo.FindAll()
 }
 
 /*
-GetCategoryByID mendapatkan kategori berdasarkan ID.
-Mengembalikan model atau error.
+Mengambil kategori berdasarkan ID.
+Mengembalikan data kategori atau error jika tidak ditemukan.
 */
 func (s *categoryService) GetCategoryByID(id string) (*model.CategoryModel, error) {
 	if id == "" {
@@ -98,8 +100,8 @@ func (s *categoryService) GetCategoryByID(id string) (*model.CategoryModel, erro
 }
 
 /*
-UpdateCategory mengupdate kategori berdasarkan ID.
-Mengembalikan model atau error.
+Mengupdate kategori.
+Mengembalikan data kategori yang diupdate atau error jika validasi/not found/gagal.
 */
 func (s *categoryService) UpdateCategory(id string, input *model.CategoryModel) (*model.CategoryModel, error) {
 	// Validasi ID
@@ -146,8 +148,8 @@ func (s *categoryService) UpdateCategory(id string, input *model.CategoryModel) 
 }
 
 /*
-DeleteCategory menghapus kategori berdasarkan ID.
-Mengembalikan error.
+Menghapus kategori berdasarkan ID.
+Mengembalikan error jika validasi/not found/gagal.
 */
 func (s *categoryService) DeleteCategory(id string) error {
 	if id == "" {

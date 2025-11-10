@@ -7,7 +7,8 @@ import (
 )
 
 /*
-CategoryRoutes mendaftarkan route untuk kategori.
+Mendaftarkan route kategori.
+Menyiapkan endpoint untuk menambah, update, hapus (terproteksi) dan list/detail (publik).
 */
 func CategoryRoutes(h *handler.CategoryHandler) {
 	v1 := "/v1/category"
@@ -22,7 +23,7 @@ func CategoryRoutes(h *handler.CategoryHandler) {
 	http.Handle(v1+"/update", updateHandler)
 	http.Handle(v1+"/delete", deleteHandler)
 
-	// Public endpoints (tidak perlu login untuk melihat kategori)
+	// Public endpoints (tidak perlu login)
 	http.HandleFunc(v1+"/list", h.GetAllCategories)
 	http.HandleFunc(v1+"/detail", h.GetCategoryByID)
 }
