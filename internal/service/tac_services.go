@@ -52,11 +52,75 @@ func (s *termsAndConditionsService) AddTermsAndConditions(input *model.TermsAndC
 }
 
 /*
+Update TAC berdasarkan ID.
+Mengembalikan data TAC yang diupdate atau error jika validasi/gagal.
+*/
+func (s *termsAndConditionsService) UpdateTermAndConditions(id string, input *model.TermsAndConditionsModel) (*model.TermsAndConditionsModel, error) {
+	// Validasi ID
+	if id == "" {
+		return nil, errors.New(message.MsgTermAndConditionsIDRequired)
+	}
+
+	// Validasi input
+	if len(input.Description) == 0 {
+		return nil, errors.New(message.MsgTermAndConditionsDescriptionRequired)
+	}
+
+	// Update TAC
+	input.ID = id
+	if err := s.repo.UpdateTermAndConditions(input); err != nil {
+		return nil, err
+	}
+
+	// Mendapatkan TAC yang sudah diupdate
+	return s.repo.FindTermAndConditionsByID(id)
+}
+
+/*
+Update TAC berdasarkan userID (hanya description).
+Mengembalikan data TAC yang diupdate atau error jika validasi/gagal.
+*/
+func (s *termsAndConditionsService) UpdateTermsAndConditionsByUserID(userID string, input *model.TermsAndConditionsModel) (*model.TermsAndConditionsModel, error) {
+	// Validasi input
+	if len(input.Description) == 0 {
+		return nil, errors.New(message.MsgTermAndConditionsDescriptionRequired)
+	}
+
+	// Cari TAC existing berdasarkan userID
+	existing, err := s.repo.FindByUserID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if existing == nil {
+		return nil, errors.New(message.MsgTermAndConditionsNotFound)
+	}
+
+	// Update description
+	existing.Description = input.Description
+	if err := s.repo.UpdateTermAndConditions(existing); err != nil {
+		return nil, err
+	}
+
+	return existing, nil
+}
+
+/*
+Mengambil semua TAC.
+Mengembalikan list TAC atau error jika gagal.
+*/
+func (s *termsAndConditionsService) GetAllTermAndConditions() ([]*model.TermsAndConditionsModel, error) {
+	return s.repo.FindAllTermAndConditions()
+}
+
+/*
 Mendefinisikan operasi service TAC.
-Menyediakan method untuk menambah TAC dengan hasil sukses atau error.
+Menyediakan method untuk menambah, update, dan ambil TAC dengan hasil sukses atau error.
 */
 type TermsAndConditionsService interface {
 	AddTermsAndConditions(input *model.TermsAndConditionsModel) (*model.TermsAndConditionsModel, error)
+	GetAllTermAndConditions() ([]*model.TermsAndConditionsModel, error)
+	UpdateTermAndConditions(id string, input *model.TermsAndConditionsModel) (*model.TermsAndConditionsModel, error)
+	UpdateTermsAndConditionsByUserID(userID string, input *model.TermsAndConditionsModel) (*model.TermsAndConditionsModel, error)
 }
 
 /*

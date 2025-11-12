@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"log"
 	"strings"
@@ -120,10 +121,16 @@ func (s *hosterService) LoginHoster(email, password string) (*HosterResponse, er
 }
 
 /*
-Mengambil profil hoster.
+Mengambil profil hoster berdasarkan user yang sedang login (dari token).
 Mengembalikan data hoster atau error jika tidak ditemukan.
 */
-func (s *hosterService) GetHosterProfile(userID string) (*model.HosterModel, error) {
+func (s *hosterService) GetHosterProfile(ctx context.Context) (*model.HosterModel, error) {
+	// Ekstrak userID dari context (misalnya dari JWT claims yang disimpan di middleware)
+	userID, ok := ctx.Value("user_id").(string)
+	if !ok || userID == "" {
+		return nil, errors.New(message.MsgUnauthorized)
+	}
+
 	log.Printf("get profile userid: %s", userID)
 	hoster, err := s.repo.GetHosterByID(userID)
 	if err != nil {
@@ -143,7 +150,7 @@ Menyediakan method untuk registrasi, login, dan ambil profil dengan hasil sukses
 type HosterService interface {
 	Register(input *model.HosterModel) (*HosterResponse, error)
 	LoginHoster(email, password string) (*HosterResponse, error)
-	GetHosterProfile(userID string) (*model.HosterModel, error)
+	GetHosterProfile(ctx context.Context) (*model.HosterModel, error) // Ubah parameter ke context
 }
 
 /*

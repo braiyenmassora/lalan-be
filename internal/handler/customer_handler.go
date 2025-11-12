@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"lalan-be/internal/middleware"
 	"lalan-be/internal/model"
@@ -106,7 +107,10 @@ func (h *CustomerHandler) GetCustomerProfile(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	customer, err := h.customerService.GetCustomerProfile(customerID)
+	// Buat context dengan userID
+	ctx := context.WithValue(context.Background(), "user_id", customerID)
+
+	customer, err := h.customerService.GetCustomerProfile(ctx)
 	if err != nil {
 		if err.Error() == message.MsgCustomerNotFound {
 			response.Error(w, http.StatusNotFound, err.Error())

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"lalan-be/internal/config"
 	"lalan-be/internal/model"
@@ -106,9 +107,15 @@ func (s *customerService) LoginCustomer(email, password string) (*CustomerRespon
 	return s.generateTokenCustomer(customer.ID)
 }
 
-// GetCustomerProfile mengambil profil customer.
+// GetCustomerProfile mengambil profil customer berdasarkan user yang sedang login (dari token).
 // Mengembalikan data customer atau error jika tidak ditemukan.
-func (s *customerService) GetCustomerProfile(userID string) (*model.CustomerModel, error) {
+func (s *customerService) GetCustomerProfile(ctx context.Context) (*model.CustomerModel, error) {
+	// Ekstrak userID dari context (misalnya dari JWT claims yang disimpan di middleware)
+	userID, ok := ctx.Value("user_id").(string)
+	if !ok || userID == "" {
+		return nil, errors.New(message.MsgUnauthorized)
+	}
+
 	log.Printf("get profile userid: %s", userID)
 	customer, err := s.repo.GetCustomerByID(userID)
 	if err != nil {
@@ -126,7 +133,7 @@ func (s *customerService) GetCustomerProfile(userID string) (*model.CustomerMode
 type CustomerService interface {
 	RegisterCustomer(input *model.CustomerModel) (*CustomerResponse, error)
 	LoginCustomer(email, password string) (*CustomerResponse, error)
-	GetCustomerProfile(userID string) (*model.CustomerModel, error)
+	GetCustomerProfile(ctx context.Context) (*model.CustomerModel, error) // Ubah parameter ke context
 }
 
 // NewCustomerService membuat service autentikasi.

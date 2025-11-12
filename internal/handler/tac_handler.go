@@ -7,6 +7,7 @@ import (
 	"lalan-be/internal/response"
 	"lalan-be/internal/service"
 	"lalan-be/pkg/message"
+	"log"
 	"net/http"
 )
 
@@ -87,3 +88,70 @@ func (h *TermsAndConditionsHandler) AddTermsAndConditions(w http.ResponseWriter,
 
 // Tambahkan method lain jika diperlukan untuk CRUD lengkap, dengan validasi role serupa
 // Contoh: GetTermsAndConditions, UpdateTermsAndConditions, DeleteTermsAndConditions
+func (h *TermsAndConditionsHandler) GetAllTermAndConditions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		response.BadRequest(w, message.MsgNotAllowed)
+		return
+	}
+
+	categories, err := h.service.GetAllTermAndConditions()
+	if err != nil {
+		response.BadRequest(w, err.Error())
+		return
+	}
+
+	response.OK(w, categories, message.MsgSuccess)
+}
+
+func (h *TermsAndConditionsHandler) UpdateTermAndConditions(w http.ResponseWriter, r *http.Request) {
+	// Tambahkan log untuk debug
+	log.Printf("UpdateTermAndConditions called for userID: %s", middleware.GetUserID(r))
+
+	if r.Method != http.MethodPut {
+		response.BadRequest(w, message.MsgNotAllowed)
+		return
+	}
+
+	// Validasi role: hanya hoster yang bisa
+	userRole := middleware.GetUserRole(r)
+	if userRole != "hoster" {
+		response.Forbidden(w, "Access denied: only hosters can update terms and conditions")
+		return
+	}
+
+	userID := middleware.GetUserID(r)
+	if userID == "" {
+		response.Unauthorized(w, message.MsgUnauthorized)
+		return
+	}
+
+	var req TermsAndConditionsRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		response.BadRequest(w, message.MsgBadRequest)
+		return
+	}
+
+	if len(req.Description) == 0 {
+		response.BadRequest(w, message.MsgTermAndConditionsDescriptionRequired)
+		return
+	}
+
+	input := &model.TermsAndConditionsModel{
+		Description: req.Description,
+	}
+
+	tncResp, err := h.service.UpdateTermsAndConditionsByUserID(userID, input)
+	if err != nil {
+		log.Printf("Error updating TAC: %v", err) // Tambahkan log error
+		if err.Error() == message.MsgTermAndConditionsNotFound {
+			response.Error(w, http.StatusNotFound, err.Error())
+		} else {
+			response.BadRequest(w, err.Error())
+		}
+		return
+	}
+
+	response.OK(w, tncResp, message.MsgTermAndConditionsUpdatedSuccess)
+}
