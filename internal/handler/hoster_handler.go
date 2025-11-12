@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -117,7 +118,10 @@ func (h *HosterHandler) GetHosterProfile(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	hoster, err := h.service.GetHosterProfile(userID)
+	// Buat context dengan userID
+	ctx := context.WithValue(context.Background(), "user_id", userID)
+
+	hoster, err := h.service.GetHosterProfile(ctx)
 	if err != nil {
 		if err.Error() == message.MsgHosterNotFound {
 			response.Error(w, http.StatusNotFound, err.Error())

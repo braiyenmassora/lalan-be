@@ -18,26 +18,6 @@ type categoryService struct {
 }
 
 /*
-Mendefinisikan operasi service kategori.
-Menyediakan method untuk menambah, ambil semua, ambil by ID, update, dan hapus kategori dengan hasil sukses atau error.
-*/
-type CategoryService interface {
-	AddCategory(input *model.CategoryModel) (*model.CategoryModel, error)
-	GetAllCategories() ([]*model.CategoryModel, error)
-	GetCategoryByID(id string) (*model.CategoryModel, error)
-	UpdateCategory(id string, input *model.CategoryModel) (*model.CategoryModel, error)
-	DeleteCategory(id string) error
-}
-
-/*
-Membuat service kategori.
-Mengembalikan instance CategoryService yang siap digunakan.
-*/
-func NewCategoryService(repo repository.CategoryRepository) CategoryService {
-	return &categoryService{repo: repo}
-}
-
-/*
 Menambahkan kategori baru.
 Mengembalikan data kategori yang dibuat atau error jika validasi/gagal.
 */
@@ -167,4 +147,24 @@ func (s *categoryService) DeleteCategory(id string) error {
 
 	// Hapus kategori
 	return s.repo.Delete(id)
+}
+
+/*
+Mendefinisikan operasi service kategori.
+Menyediakan method untuk menambah, ambil semua, ambil by ID, update, dan hapus kategori dengan hasil sukses atau error.
+*/
+type CategoryService interface {
+	AddCategory(input *model.CategoryModel) (*model.CategoryModel, error)
+	GetAllCategories() ([]*model.CategoryModel, error)
+	GetCategoryByID(id string) (*model.CategoryModel, error)
+	UpdateCategory(id string, input *model.CategoryModel) (*model.CategoryModel, error)
+	DeleteCategory(id string) error
+}
+
+/*
+Membuat service kategori.
+Mengembalikan instance CategoryService yang siap digunakan.
+*/
+func NewCategoryService(repo repository.CategoryRepository) CategoryService {
+	return &categoryService{repo: repo}
 }
