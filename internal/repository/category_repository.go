@@ -20,7 +20,7 @@ Mencari kategori berdasarkan nama.
 Mengembalikan data kategori atau nil jika tidak ditemukan.
 */
 func (r *categoryRepository) FindCategoryName(name string) (*model.CategoryModel, error) {
-	query := "SELECT id, name, description, created_at, updated_at FROM categories WHERE name = $1 LIMIT 1"
+	query := "SELECT id, name, description, created_at, updated_at FROM category WHERE name = $1 LIMIT 1"
 	var category model.CategoryModel
 	err := r.db.Get(&category, query, name)
 	if err == sql.ErrNoRows {
@@ -38,7 +38,7 @@ Membuat kategori baru di database.
 Mengembalikan error jika penyisipan gagal.
 */
 func (r *categoryRepository) CreateCategory(category *model.CategoryModel) error {
-	query := `INSERT INTO categories (id, name, description, created_at, updated_at) 
+	query := `INSERT INTO category (id, name, description, created_at, updated_at) 
 	          VALUES ($1, $2, $3, NOW(), NOW())`
 	_, err := r.db.Exec(query, category.ID, category.Name, category.Description)
 	if err != nil {
@@ -53,7 +53,7 @@ Mengambil semua kategori.
 Mengembalikan daftar kategori atau error jika gagal.
 */
 func (r *categoryRepository) FindAll() ([]*model.CategoryModel, error) {
-	query := "SELECT id, name, description, created_at, updated_at FROM categories ORDER BY created_at DESC"
+	query := "SELECT id, name, description, created_at, updated_at FROM category ORDER BY created_at DESC"
 	var categories []*model.CategoryModel
 	err := r.db.Select(&categories, query)
 	if err != nil {
@@ -68,7 +68,7 @@ Mencari kategori berdasarkan ID.
 Mengembalikan data kategori atau nil jika tidak ditemukan.
 */
 func (r *categoryRepository) FindByID(id string) (*model.CategoryModel, error) {
-	query := "SELECT id, name, description, created_at, updated_at FROM categories WHERE id = $1 LIMIT 1"
+	query := "SELECT id, name, description, created_at, updated_at FROM category WHERE id = $1 LIMIT 1"
 	var category model.CategoryModel
 	err := r.db.Get(&category, query, id)
 	if err == sql.ErrNoRows {
@@ -86,7 +86,7 @@ Memperbarui kategori.
 Mengembalikan error jika update gagal atau tidak ada baris terpengaruh.
 */
 func (r *categoryRepository) Update(category *model.CategoryModel) error {
-	query := `UPDATE categories 
+	query := `UPDATE category 
 	          SET name = $2, description = $3, updated_at = NOW() 
 	          WHERE id = $1`
 	result, err := r.db.Exec(query, category.ID, category.Name, category.Description)
@@ -113,7 +113,7 @@ Menghapus kategori berdasarkan ID.
 Mengembalikan error jika penghapusan gagal atau tidak ada baris terpengaruh.
 */
 func (r *categoryRepository) Delete(id string) error {
-	query := "DELETE FROM categories WHERE id = $1"
+	query := "DELETE FROM category WHERE id = $1"
 	result, err := r.db.Exec(query, id)
 	if err != nil {
 		log.Printf("Delete error: %v", err)

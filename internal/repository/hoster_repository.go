@@ -22,7 +22,7 @@ Mengembalikan error jika penyisipan gagal.
 */
 func (r *authRepository) CreateHoster(h *model.HosterModel) error {
 	query := `
-        INSERT INTO hosters (
+        INSERT INTO hoster (
             id, full_name, profile_photo, store_name, description, phone_number, email, address, password_hash, website, instagram, tiktok
         )
         VALUES (:id, :full_name, :profile_photo, :store_name, :description, :phone_number, :email, :address, :password_hash, :website, :instagram, :tiktok)
@@ -42,7 +42,7 @@ Mengembalikan data hoster atau nil jika tidak ditemukan.
 */
 func (r *authRepository) FindByEmail(email string) (*model.HosterModel, error) {
 	var hoster model.HosterModel
-	query := `SELECT * FROM hosters WHERE email = $1 LIMIT 1`
+	query := `SELECT * FROM hoster WHERE email = $1 LIMIT 1`
 
 	err := r.db.Get(&hoster, query, email)
 	if err == sql.ErrNoRows {
@@ -65,7 +65,7 @@ func (r *authRepository) FindByEmailForLogin(email string) (*model.HosterModel, 
             id, email, password_hash, full_name, phone_number,
             store_name, description, address, profile_photo, website, instagram, tiktok,
             created_at, updated_at
-        FROM hosters
+        FROM hoster
         WHERE email = $1
           AND password_hash IS NOT NULL
         LIMIT 1
@@ -108,7 +108,7 @@ func (r *authRepository) GetHosterByID(id string) (*model.HosterModel, error) {
         SELECT
             id, full_name, profile_photo, store_name, description, website, instagram, tiktok,
             phone_number, email, address, created_at, updated_at
-        FROM hosters
+        FROM hoster
         WHERE id = $1
         LIMIT 1
     `

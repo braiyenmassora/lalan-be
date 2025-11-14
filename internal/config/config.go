@@ -12,17 +12,12 @@ import (
 	_ "github.com/lib/pq"
 )
 
-/*
-Struct untuk menyimpan koneksi database.
-*/
+/* Menyimpan koneksi database. Struct dengan field DB. */
 type Config struct {
 	DB *sqlx.DB
 }
 
-/*
-Mengambil nilai environment dengan fallback.
-Mengembalikan string nilai atau fallback.
-*/
+/* Mengambil nilai environment dengan fallback. Mengembalikan string nilai atau fallback. */
 func getEnv(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -30,10 +25,7 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-/*
-Menginisialisasi koneksi database PostgreSQL.
-Mengembalikan pointer ke Config atau error jika gagal.
-*/
+/* Menginisialisasi koneksi database PostgreSQL. Mengembalikan pointer ke Config atau error jika gagal. */
 func DatabaseConfig() (*Config, error) {
 	_ = godotenv.Load(".env.dev")
 
@@ -62,9 +54,7 @@ func DatabaseConfig() (*Config, error) {
 	return &Config{DB: db}, nil
 }
 
-/*
-Test koneksi database menggunakan pgx untuk verifikasi tambahan.
-*/
+/* Test koneksi database menggunakan pgx untuk verifikasi tambahan. Tidak mengembalikan nilai, log sukses atau fatal error. */
 func TestDatabaseConnection(dsn string) {
 	conn, err := pgx.Connect(context.Background(), dsn)
 	if err != nil {
@@ -81,10 +71,7 @@ func TestDatabaseConnection(dsn string) {
 	log.Println("Database connection test successful")
 }
 
-/*
-Mengambil secret JWT dari environment.
-Mengembalikan byte slice secret.
-*/
+/* Mengambil secret JWT dari environment. Mengembalikan byte slice secret. */
 func GetJWTSecret() []byte {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {

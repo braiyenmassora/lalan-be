@@ -21,7 +21,7 @@ Mengembalikan error jika penyisipan gagal.
 */
 func (r *customerRepository) CreateCustomer(customer *model.CustomerModel) error {
 	query := `
-        INSERT INTO customers (
+        INSERT INTO customer (
             id, full_name, profile_photo, phone_number, email, address, password_hash
         )
         VALUES (:id, :full_name, :profile_photo, :phone_number, :email, :address, :password_hash)
@@ -45,7 +45,7 @@ func (r *customerRepository) FindByEmailCustomerForLogin(email string) (*model.C
             id, email, password_hash, full_name, phone_number,
             profile_photo, address,
             created_at, updated_at
-        FROM customers  
+        FROM customer  
         WHERE email = $1
           AND password_hash IS NOT NULL
         LIMIT 1
@@ -72,7 +72,7 @@ func (r *customerRepository) GetCustomerByID(id string) (*model.CustomerModel, e
         SELECT
             id, full_name, profile_photo,
             phone_number, email, address, created_at, updated_at
-        FROM customers  
+        FROM customer  
         WHERE id = $1
         LIMIT 1
     `

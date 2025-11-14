@@ -22,7 +22,7 @@ Mengembalikan data item atau nil jika tidak ditemukan.
 */
 func (r *itemRepository) FindItemNameByUserID(name string, userId string) (*model.ItemModel, error) {
 	query := `SELECT id, name, description, photos, stock, pickup_type, price_per_day, deposit, discount, category_id, user_id, created_at, updated_at 
-	          FROM items WHERE name = $1 AND user_id = $2 LIMIT 1`
+	          FROM item WHERE name = $1 AND user_id = $2 LIMIT 1`
 
 	var item model.ItemModel
 	var photosJSON []byte
@@ -60,7 +60,7 @@ func (r *itemRepository) CreateItem(item *model.ItemModel) error {
 		return err
 	}
 
-	query := `INSERT INTO items (id, name, description, photos, stock, pickup_type, price_per_day, deposit, discount, category_id, user_id, created_at, updated_at) 
+	query := `INSERT INTO item (id, name, description, photos, stock, pickup_type, price_per_day, deposit, discount, category_id, user_id, created_at, updated_at) 
 	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())`
 
 	_, err = r.db.Exec(query, item.ID, item.Name, item.Description, photosJSON,
@@ -81,7 +81,7 @@ Mengembalikan daftar item atau error jika gagal.
 */
 func (r *itemRepository) FindAll() ([]*model.ItemModel, error) {
 	query := `SELECT id, name, description, photos, stock, pickup_type, price_per_day, deposit, discount, category_id, user_id, created_at, updated_at 
-	          FROM items ORDER BY created_at DESC`
+	          FROM item ORDER BY created_at DESC`
 
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -120,7 +120,7 @@ Mengembalikan data item atau nil jika tidak ditemukan.
 */
 func (r *itemRepository) FindByID(id string) (*model.ItemModel, error) {
 	query := `SELECT id, name, description, photos, stock, pickup_type, price_per_day, deposit, discount, category_id, user_id, created_at, updated_at 
-	          FROM items WHERE id = $1 LIMIT 1`
+	          FROM item WHERE id = $1 LIMIT 1`
 
 	var item model.ItemModel
 	var photosJSON []byte
@@ -152,7 +152,7 @@ Mengembalikan daftar item user atau error jika gagal.
 */
 func (r *itemRepository) FindByUserID(userID string) ([]*model.ItemModel, error) {
 	query := `SELECT id, name, description, photos, stock, pickup_type, price_per_day, deposit, discount, category_id, user_id, created_at, updated_at 
-	          FROM items WHERE user_id = $1 ORDER BY created_at DESC`
+	          FROM item WHERE user_id = $1 ORDER BY created_at DESC`
 
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
@@ -197,7 +197,7 @@ func (r *itemRepository) Update(item *model.ItemModel) error {
 		return err
 	}
 
-	query := `UPDATE items 
+	query := `UPDATE item 
 	          SET name = $2, description = $3, photos = $4, stock = $5, pickup_type = $6, 
 	              price_per_day = $7, deposit = $8, discount = $9, category_id = $10, updated_at = NOW() 
 	          WHERE id = $1`
@@ -228,7 +228,7 @@ Menghapus item berdasarkan ID.
 Mengembalikan error jika penghapusan gagal atau tidak ada baris terpengaruh.
 */
 func (r *itemRepository) Delete(id string) error {
-	query := "DELETE FROM items WHERE id = $1"
+	query := "DELETE FROM item WHERE id = $1"
 
 	result, err := r.db.Exec(query, id)
 	if err != nil {
