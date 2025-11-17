@@ -3,8 +3,8 @@ package model
 import "time"
 
 /*
-Konstanta untuk metode pengambilan item.
-Konstanta ini mendefinisikan metode pengambilan yang tersedia.
+Mendefinisikan metode pengambilan item yang tersedia.
+Digunakan dalam validasi dan pemilihan cara pengambilan.
 */
 const (
 	PickupMethodSelfPickup PickupMethod = "pickup"
@@ -12,14 +12,14 @@ const (
 )
 
 /*
-Type untuk metode pengambilan item.
-Type ini digunakan untuk menentukan cara pengambilan item.
+Mewakili tipe metode pengambilan item.
+Digunakan untuk menentukan cara pengambilan dalam model item.
 */
 type PickupMethod string
 
 /*
-Struktur untuk model item.
-Struktur ini merepresentasikan data item dengan field yang diperlukan.
+Merepresentasikan data item dengan field yang diperlukan.
+Digunakan untuk serialisasi JSON dan interaksi database.
 */
 type ItemModel struct {
 	ID          string       `json:"id" db:"id"`

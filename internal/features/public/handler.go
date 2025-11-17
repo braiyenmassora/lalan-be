@@ -9,78 +9,70 @@ import (
 )
 
 /*
-Struktur untuk handler public.
-Struktur ini menangani permintaan publik.
+PublicHandler menangani permintaan publik.
+Menyediakan endpoint tanpa autentikasi.
 */
 type PublicHandler struct {
 	service PublicService
 }
 
 /*
-Metode untuk mendapatkan semua kategori.
-Daftar kategori dikembalikan.
+Methods untuk PublicHandler menangani operasi publik kategori, item, dan terms.
+Dipanggil dari router untuk akses umum.
 */
 func (h *PublicHandler) GetAllCategories(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GetCategories: received request")
 	if r.Method != http.MethodGet {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 
 	categories, err := h.service.GetAllCategory()
 	if err != nil {
-		response.BadRequest(w, err.Error())
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 
 	response.OK(w, categories, message.MsgSuccess)
 }
 
-/*
-Metode untuk mendapatkan semua item.
-Daftar item dikembalikan.
-*/
 func (h *PublicHandler) GetAllItems(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GetAllItems: received request")
 	if r.Method != http.MethodGet {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 
 	items, err := h.service.GetAllItems()
 	if err != nil {
 		log.Printf("GetAllItems: error: %v", err)
-		response.Error(w, http.StatusInternalServerError, err.Error())
+		response.Error(w, http.StatusInternalServerError, message.MsgInternalServerError)
 		return
 	}
 
-	response.Success(w, http.StatusOK, items, "Items retrieved successfully")
+	response.OK(w, items, message.MsgSuccess)
 }
 
-/*
-Metode untuk mendapatkan semua syarat dan ketentuan.
-Daftar syarat dan ketentuan dikembalikan.
-*/
 func (h *PublicHandler) GetAllTermsAndConditions(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GetAllTermsAndConditions: received request")
 	if r.Method != http.MethodGet {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 
 	tacs, err := h.service.GetAllTermsAndConditions()
 	if err != nil {
 		log.Printf("GetAllTermsAndConditions: error: %v", err)
-		response.Error(w, http.StatusInternalServerError, err.Error())
+		response.Error(w, http.StatusInternalServerError, message.MsgInternalServerError)
 		return
 	}
 
-	response.Success(w, http.StatusOK, tacs, "Terms and conditions retrieved successfully")
+	response.OK(w, tacs, message.MsgSuccess)
 }
 
 /*
-Fungsi untuk membuat instance baru dari PublicHandler.
-Instance handler dikembalikan.
+NewPublicHandler membuat instance PublicHandler.
+Menginisialisasi handler dengan service.
 */
 func NewPublicHandler(s PublicService) *PublicHandler {
 	return &PublicHandler{service: s}

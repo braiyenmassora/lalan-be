@@ -2,28 +2,29 @@ package hoster
 
 import (
 	"encoding/json"
-	"lalan-be/internal/model"
-	"lalan-be/internal/response"
-	"lalan-be/pkg/message"
 	"log"
 	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/gorilla/mux"
+
+	"lalan-be/internal/model"
+	"lalan-be/internal/response"
+	"lalan-be/pkg/message"
 )
 
 /*
-Struktur untuk menangani permintaan terkait hoster.
-Struktur ini menyediakan layanan untuk operasi hoster.
+HosterHandler menangani permintaan terkait hoster.
+Menyediakan layanan untuk operasi hoster melalui service.
 */
 type HosterHandler struct {
 	service HosterService
 }
 
 /*
-Struktur untuk permintaan pembuatan hoster.
-Struktur ini berisi data yang diperlukan untuk membuat hoster baru.
+HosterRequest berisi data untuk membuat hoster baru.
+Digunakan dalam permintaan pembuatan hoster.
 */
 type HosterRequest struct {
 	FullName     string `json:"full_name"`
@@ -40,8 +41,8 @@ type HosterRequest struct {
 }
 
 /*
-Struktur untuk permintaan login hoster.
-Struktur ini berisi kredensial untuk autentikasi hoster.
+LoginRequest berisi kredensial untuk autentikasi hoster.
+Digunakan dalam permintaan login hoster.
 */
 type LoginRequest struct {
 	Email    string `json:"email"`
@@ -49,13 +50,13 @@ type LoginRequest struct {
 }
 
 /*
-Metode untuk membuat hoster baru.
-Metode ini memvalidasi input dan membuat hoster melalui layanan.
+Methods untuk HosterHandler menangani operasi hoster, item, dan syarat ketentuan.
+Dipanggil dari router untuk memproses permintaan HTTP.
 */
 func (h *HosterHandler) CreateHoster(w http.ResponseWriter, r *http.Request) {
 	log.Printf("CreateHoster: received request")
 	if r.Method != http.MethodPost {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 	var req HosterRequest
@@ -68,17 +69,17 @@ func (h *HosterHandler) CreateHoster(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(req.FullName) == "" {
 		log.Printf("CreateAdmin: full name required")
-		response.BadRequest(w, "Full name is required")
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 	if strings.TrimSpace(req.Email) == "" {
 		log.Printf("CreateAdmin: email required")
-		response.BadRequest(w, "Email is required")
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 	if strings.TrimSpace(req.Password) == "" {
 		log.Printf("CreateAdmin: password required")
-		response.BadRequest(w, "Password is required")
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 	input := &model.HosterModel{
@@ -100,17 +101,13 @@ func (h *HosterHandler) CreateHoster(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, err.Error())
 		return
 	}
-	response.Created(w, input, message.MsgSuccess)
+	response.OK(w, input, message.MsgSuccess)
 }
 
-/*
-Metode untuk login hoster.
-Metode ini memvalidasi kredensial dan mengembalikan token autentikasi.
-*/
 func (h *HosterHandler) LoginHoster(w http.ResponseWriter, r *http.Request) {
 	log.Printf("LoginHoster: received request")
 	if r.Method != http.MethodPost {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 	var req LoginRequest
@@ -123,19 +120,19 @@ func (h *HosterHandler) LoginHoster(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Email == "" || req.Password == "" {
 		log.Printf("LoginHoster: email or password empty")
-		response.Error(w, http.StatusBadRequest, "Email and password are required")
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	if !emailRegex.MatchString(req.Email) {
 		log.Printf("LoginHoster: invalid email format: %s", req.Email)
-		response.Error(w, http.StatusBadRequest, "Invalid email format")
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 	resp, err := h.service.LoginHoster(req.Email, req.Password)
 	if err != nil {
 		log.Printf("LoginHoster: login failed: %v", err)
-		response.Error(w, http.StatusUnauthorized, "Invalid credentials")
+		response.Error(w, http.StatusUnauthorized, message.MsgUnauthorized)
 		return
 	}
 	log.Printf("LoginHoster: login successful for email %s", req.Email)
@@ -154,43 +151,35 @@ func (h *HosterHandler) LoginHoster(w http.ResponseWriter, r *http.Request) {
 		"token_type":    resp.TokenType,
 		"expires_in":    resp.ExpiresIn,
 	}
-	response.Success(w, 200, userData, "Login successful")
+	response.OK(w, userData, message.MsgSuccess)
 }
 
-/*
-Metode untuk mendapatkan detail hoster.
-Metode ini mengambil data hoster berdasarkan konteks permintaan.
-*/
 func (h *HosterHandler) GetDetailHoster(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GetDetailHoster: received request")
 	if r.Method != http.MethodGet {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 	ctx := r.Context()
 	hoster, err := h.service.GetDetailHoster(ctx)
 	if err != nil {
 		log.Printf("GetDetailHoster: error getting hoster: %v", err)
-		response.Error(w, http.StatusInternalServerError, err.Error())
+		response.Error(w, http.StatusInternalServerError, message.MsgInternalServerError)
 		return
 	}
 	if hoster == nil {
 		log.Printf("GetDetailHoster: hoster not found")
-		response.Error(w, http.StatusNotFound, "Hoster not found")
+		response.Error(w, http.StatusNotFound, message.MsgHosterNotFound)
 		return
 	}
 	log.Printf("GetDetailHoster: retrieved hoster for ID %s", hoster.ID)
-	response.Success(w, http.StatusOK, hoster, "Hoster details retrieved successfully")
+	response.OK(w, hoster, message.MsgSuccess)
 }
 
-/*
-Metode untuk membuat item baru.
-Metode ini memvalidasi dan membuat item melalui layanan.
-*/
 func (h *HosterHandler) CreateItem(w http.ResponseWriter, r *http.Request) {
 	log.Printf("CreateItem: received request")
 	if r.Method != http.MethodPost {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 	var req model.ItemModel
@@ -208,67 +197,55 @@ func (h *HosterHandler) CreateItem(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, err.Error())
 		return
 	}
-	response.Created(w, item, message.MsgItemCreatedSuccess)
+	response.OK(w, item, message.MsgItemCreatedSuccess)
 }
 
-/*
-Metode untuk mendapatkan item berdasarkan ID.
-Metode ini mengambil data item spesifik dari layanan.
-*/
 func (h *HosterHandler) GetItemByID(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GetItemByID: received request")
 	if r.Method != http.MethodGet {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 	vars := mux.Vars(r)
 	id := strings.TrimSpace(vars["id"])
 	if id == "" {
-		response.BadRequest(w, message.MsgItemIDRequired)
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 	item, err := h.service.GetItemByID(id)
 	if err != nil {
 		log.Printf("GetItemByID: error: %v", err)
-		response.Error(w, http.StatusInternalServerError, err.Error())
+		response.Error(w, http.StatusInternalServerError, message.MsgInternalServerError)
 		return
 	}
-	response.Success(w, http.StatusOK, item, "Item retrieved successfully")
+	response.OK(w, item, message.MsgSuccess)
 }
 
-/*
-Metode untuk mendapatkan semua item.
-Metode ini mengambil daftar semua item dari layanan.
-*/
 func (h *HosterHandler) GetAllItems(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GetAllItems: received request")
 	if r.Method != http.MethodGet {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 	items, err := h.service.GetAllItems()
 	if err != nil {
 		log.Printf("GetAllItems: error: %v", err)
-		response.Error(w, http.StatusInternalServerError, err.Error())
+		response.Error(w, http.StatusInternalServerError, message.MsgInternalServerError)
 		return
 	}
-	response.Success(w, http.StatusOK, items, "Items retrieved successfully")
+	response.OK(w, items, message.MsgSuccess)
 }
 
-/*
-Metode untuk memperbarui item.
-Metode ini memvalidasi dan memperbarui item melalui layanan.
-*/
 func (h *HosterHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 	log.Printf("UpdateItem: received request")
 	if r.Method != http.MethodPut {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 	vars := mux.Vars(r)
 	id := strings.TrimSpace(vars["id"])
 	if id == "" {
-		response.BadRequest(w, message.MsgItemIDRequired)
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 	var req model.ItemModel
@@ -286,23 +263,19 @@ func (h *HosterHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, err.Error())
 		return
 	}
-	response.OK(w, item, message.MsgItemUpdatedSuccess)
+	response.OK(w, item, message.MsgSuccess)
 }
 
-/*
-Metode untuk menghapus item.
-Metode ini menghapus item berdasarkan ID melalui layanan.
-*/
 func (h *HosterHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	log.Printf("DeleteItem: received request")
 	if r.Method != http.MethodDelete {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 	vars := mux.Vars(r)
 	id := strings.TrimSpace(vars["id"])
 	if id == "" {
-		response.BadRequest(w, message.MsgItemIDRequired)
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 	ctx := r.Context()
@@ -312,17 +285,13 @@ func (h *HosterHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, err.Error())
 		return
 	}
-	response.OK(w, nil, message.MsgItemDeletedSuccess)
+	response.OK(w, nil, message.MsgSuccess)
 }
 
-/*
-Metode untuk membuat syarat dan ketentuan.
-Metode ini memvalidasi dan membuat syarat dan ketentuan melalui layanan.
-*/
 func (h *HosterHandler) CreateTermsAndConditions(w http.ResponseWriter, r *http.Request) {
 	log.Printf("CreateTermsAndConditions: received request")
 	if r.Method != http.MethodPost {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 	var req model.TermsAndConditionsModel
@@ -340,66 +309,55 @@ func (h *HosterHandler) CreateTermsAndConditions(w http.ResponseWriter, r *http.
 		response.BadRequest(w, err.Error())
 		return
 	}
-	response.Created(w, tac, "Terms and conditions created successfully")
+	response.OK(w, tac, message.MsgTnCCreatedSuccess)
 }
 
-/*
-Metode untuk menemukan syarat dan ketentuan berdasarkan ID.
-Metode ini mengambil data syarat dan ketentuan spesifik dari layanan.
-*/
 func (h *HosterHandler) FindTermsAndConditionsByID(w http.ResponseWriter, r *http.Request) {
 	log.Printf("FindTermsAndConditionsByID: received request")
 	if r.Method != http.MethodGet {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 	vars := mux.Vars(r)
 	id := strings.TrimSpace(vars["id"])
 	if id == "" {
-		response.BadRequest(w, "ID is required")
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 	tac, err := h.service.FindTermsAndConditionsByID(id)
 	if err != nil {
 		log.Printf("FindTermsAndConditionsByID: error: %v", err)
-		response.Error(w, http.StatusInternalServerError, err.Error())
+		response.Error(w, http.StatusInternalServerError, message.MsgInternalServerError)
 		return
 	}
-	response.Success(w, http.StatusOK, tac, "Terms and conditions retrieved successfully")
+	response.OK(w, tac, message.MsgSuccess)
 }
 
-/*
-Metode untuk mendapatkan semua syarat dan ketentuan.
-Metode ini mengambil daftar semua syarat dan ketentuan dari layanan.
-*/
 func (h *HosterHandler) GetAllTermsAndConditions(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GetAllTermsAndConditions: received request")
 	if r.Method != http.MethodGet {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 	tacs, err := h.service.GetAllTermsAndConditions()
 	if err != nil {
 		log.Printf("GetAllTermsAndConditions: error: %v", err)
-		response.Error(w, http.StatusInternalServerError, err.Error())
+		response.Error(w, http.StatusInternalServerError, message.MsgInternalServerError)
 		return
 	}
-	response.Success(w, http.StatusOK, tacs, "Terms and conditions retrieved successfully")
+	response.OK(w, tacs, message.MsgSuccess)
 }
 
-/*
-Metode untuk memperbarui syarat dan ketentuan.
-Metode ini memvalidasi dan memperbarui syarat dan ketentuan melalui layanan.
-*/
 func (h *HosterHandler) UpdateTermsAndConditions(w http.ResponseWriter, r *http.Request) {
 	log.Printf("UpdateTermsAndConditions: received request")
 	if r.Method != http.MethodPut {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
-	id := r.URL.Query().Get("id")
-	if strings.TrimSpace(id) == "" {
-		response.BadRequest(w, "ID is required")
+	vars := mux.Vars(r)
+	id := strings.TrimSpace(vars["id"])
+	if id == "" {
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 	var req model.TermsAndConditionsModel
@@ -417,22 +375,19 @@ func (h *HosterHandler) UpdateTermsAndConditions(w http.ResponseWriter, r *http.
 		response.BadRequest(w, err.Error())
 		return
 	}
-	response.OK(w, tac, "Terms and conditions updated successfully")
+	response.OK(w, tac, message.MsgSuccess)
 }
 
-/*
-Metode untuk menghapus syarat dan ketentuan.
-Metode ini menghapus syarat dan ketentuan berdasarkan ID melalui layanan.
-*/
 func (h *HosterHandler) DeleteTermsAndConditions(w http.ResponseWriter, r *http.Request) {
 	log.Printf("DeleteTermsAndConditions: received request")
 	if r.Method != http.MethodDelete {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
-	id := r.URL.Query().Get("id")
-	if strings.TrimSpace(id) == "" {
-		response.BadRequest(w, "ID is required")
+	vars := mux.Vars(r)
+	id := strings.TrimSpace(vars["id"])
+	if id == "" {
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 	ctx := r.Context()
@@ -442,12 +397,12 @@ func (h *HosterHandler) DeleteTermsAndConditions(w http.ResponseWriter, r *http.
 		response.BadRequest(w, err.Error())
 		return
 	}
-	response.OK(w, nil, "Terms and conditions deleted successfully")
+	response.OK(w, nil, message.MsgSuccess)
 }
 
 /*
-Fungsi untuk membuat instance baru dari HosterHandler.
-Fungsi ini menginisialisasi handler dengan layanan yang diberikan.
+NewHosterHandler membuat instance baru HosterHandler.
+Menginisialisasi handler dengan service yang diberikan.
 */
 func NewHosterHandler(s HosterService) *HosterHandler {
 	return &HosterHandler{service: s}

@@ -3,8 +3,8 @@ package model
 import "time"
 
 /*
-Struktur untuk model admin.
-Struktur ini merepresentasikan data admin dengan field yang diperlukan.
+Merepresentasikan data admin dengan field yang diperlukan.
+Digunakan untuk serialisasi JSON dan interaksi database.
 */
 type AdminModel struct {
 	ID           string    `json:"id" db:"id"`

@@ -2,25 +2,33 @@ package hoster
 
 import (
 	"github.com/gorilla/mux"
+
+	"lalan-be/internal/middleware"
 )
 
 /*
-Fungsi untuk mengatur rute fitur hoster.
-Router dikonfigurasi dengan rute yang diperlukan.
+SetupHosterRoutes mengatur rute untuk hoster.
+Mendaftarkan endpoint public dan protected dengan middleware.
 */
 func SetupHosterRoutes(router *mux.Router, handler *HosterHandler) {
-	hoster := router.PathPrefix("/api/v1/hoster").Subrouter()
-	hoster.HandleFunc("/register", handler.CreateHoster).Methods("POST")
-	hoster.HandleFunc("/login", handler.LoginHoster).Methods("POST")
-	hoster.HandleFunc("/detail", handler.GetDetailHoster).Methods("GET")
-	hoster.HandleFunc("/items", handler.CreateItem).Methods("POST")
-	hoster.HandleFunc("/items/{id}", handler.GetItemByID).Methods("GET")
-	hoster.HandleFunc("/items", handler.GetAllItems).Methods("GET")
-	hoster.HandleFunc("/items/{id}", handler.UpdateItem).Methods("PUT")
-	hoster.HandleFunc("/items/{id}", handler.DeleteItem).Methods("DELETE")
-	hoster.HandleFunc("/terms", handler.CreateTermsAndConditions).Methods("POST")
-	hoster.HandleFunc("/terms/{id}", handler.FindTermsAndConditionsByID).Methods("GET")
-	hoster.HandleFunc("/terms", handler.GetAllTermsAndConditions).Methods("GET")
-	hoster.HandleFunc("/terms", handler.UpdateTermsAndConditions).Methods("PUT")
-	hoster.HandleFunc("/terms", handler.DeleteTermsAndConditions).Methods("DELETE")
+	public := router.PathPrefix("/api/v1/hoster").Subrouter()
+	public.HandleFunc("/register", handler.CreateHoster).Methods("POST")
+	public.HandleFunc("/login", handler.LoginHoster).Methods("POST")
+
+	protected := router.PathPrefix("/api/v1/hoster").Subrouter()
+	protected.Use(middleware.JWTMiddleware)
+	protected.Use(middleware.Hoster)
+
+	protected.HandleFunc("/detail", handler.GetDetailHoster).Methods("GET")
+
+	protected.HandleFunc("/item", handler.CreateItem).Methods("POST")
+	protected.HandleFunc("/item", handler.GetAllItems).Methods("GET")
+	protected.HandleFunc("/item/{id}", handler.GetItemByID).Methods("GET")
+	protected.HandleFunc("/item/{id}", handler.UpdateItem).Methods("PUT")
+	protected.HandleFunc("/item/{id}", handler.DeleteItem).Methods("DELETE")
+
+	protected.HandleFunc("/tnc", handler.CreateTermsAndConditions).Methods("POST")
+	protected.HandleFunc("/tnc", handler.GetAllTermsAndConditions).Methods("GET")
+	protected.HandleFunc("/tnc/{id}", handler.UpdateTermsAndConditions).Methods("PUT")
+	protected.HandleFunc("/tnc/{id}", handler.DeleteTermsAndConditions).Methods("DELETE")
 }

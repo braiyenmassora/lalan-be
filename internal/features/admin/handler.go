@@ -13,50 +13,21 @@ import (
 )
 
 /*
-Struktur untuk handler admin.
-Struktur ini menangani permintaan terkait admin.
+AdminHandler menangani permintaan terkait admin.
+Menggunakan service untuk operasi bisnis admin dan kategori.
 */
 type AdminHandler struct {
 	service AdminService
 }
 
 /*
-Struktur untuk permintaan pembuatan admin.
-Struktur ini berisi data yang diperlukan untuk membuat admin baru.
-*/
-type AdminRequest struct {
-	FullName string `json:"full_name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-/*
-Struktur untuk permintaan login admin.
-Struktur ini berisi kredensial untuk autentikasi admin.
-*/
-type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-/*
-Struktur untuk permintaan kategori.
-Struktur ini berisi data untuk operasi kategori.
-*/
-type CategoryRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-/*
-Metode untuk membuat admin baru.
-Metode ini memvalidasi input dan membuat admin melalui layanan.
+Methods AdminHandler mengelola admin dan kategori.
+Menyediakan endpoint untuk CRUD dan autentikasi.
 */
 func (h *AdminHandler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 	log.Printf("CreateAdmin: received request")
-	// Cek method POST
 	if r.Method != http.MethodPost {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 	var req AdminRequest
@@ -72,21 +43,21 @@ func (h *AdminHandler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 	// Validasi full name
 	if strings.TrimSpace(req.FullName) == "" {
 		log.Printf("CreateAdmin: full name required")
-		response.BadRequest(w, "Full name is required")
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 
 	// Validasi email
 	if strings.TrimSpace(req.Email) == "" {
 		log.Printf("CreateAdmin: email required")
-		response.BadRequest(w, "Email is required")
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 
 	// Validasi password
 	if strings.TrimSpace(req.Password) == "" {
 		log.Printf("CreateAdmin: password required")
-		response.BadRequest(w, "Password is required")
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 
@@ -103,18 +74,13 @@ func (h *AdminHandler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.Created(w, input, message.MsgSuccess)
+	response.OK(w, input, message.MsgSuccess)
 }
 
-/*
-Metode untuk login admin.
-Metode ini memvalidasi kredensial dan mengembalikan token autentikasi.
-*/
 func (h *AdminHandler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 	log.Printf("LoginAdmin: received request")
-	// Cek method POST
 	if r.Method != http.MethodPost {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 
@@ -131,7 +97,7 @@ func (h *AdminHandler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 	// Validasi email dan password
 	if req.Email == "" || req.Password == "" {
 		log.Printf("LoginAdmin: email or password empty")
-		response.Error(w, http.StatusBadRequest, "Email and password are required")
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 
@@ -139,14 +105,14 @@ func (h *AdminHandler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 	// Validasi format email
 	if !emailRegex.MatchString(req.Email) {
 		log.Printf("LoginAdmin: invalid email format: %s", req.Email)
-		response.Error(w, http.StatusBadRequest, "Invalid email format")
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 
 	resp, err := h.service.LoginAdmin(req.Email, req.Password)
 	if err != nil {
 		log.Printf("LoginAdmin: login failed: %v", err)
-		response.Error(w, http.StatusUnauthorized, "Invalid credentials")
+		response.Error(w, http.StatusUnauthorized, message.MsgUnauthorized)
 		return
 	}
 
@@ -168,18 +134,13 @@ func (h *AdminHandler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 		"expires_in":    resp.ExpiresIn,
 	}
 
-	response.Success(w, 200, userData, "Login successful")
+	response.OK(w, userData, message.MsgSuccess)
 }
 
-/*
-Metode untuk membuat kategori baru.
-Metode ini memvalidasi input dan membuat kategori melalui layanan.
-*/
 func (h *AdminHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	log.Printf("CreateCategory: received request")
-	// Cek method POST
 	if r.Method != http.MethodPost {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 
@@ -196,14 +157,14 @@ func (h *AdminHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	// Validasi name
 	if strings.TrimSpace(req.Name) == "" {
 		log.Printf("CreateCategory: name required")
-		response.BadRequest(w, message.MsgCategoryNameRequired)
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 
 	// Validasi panjang name
 	if len(req.Name) > 255 {
 		log.Printf("CreateCategory: name too long")
-		response.BadRequest(w, message.MsgCategoryNameTooLong)
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 
@@ -219,18 +180,13 @@ func (h *AdminHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.Created(w, input, message.MsgCategoryCreatedSuccess)
+	response.OK(w, input, message.MsgSuccess)
 }
 
-/*
-Metode untuk memperbarui kategori.
-Metode ini memvalidasi input dan memperbarui kategori melalui layanan.
-*/
 func (h *AdminHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	log.Printf("UpdateCategory: received request")
-	// Cek method PUT
 	if r.Method != http.MethodPut {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 
@@ -238,7 +194,7 @@ func (h *AdminHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	// Validasi ID
 	if strings.TrimSpace(id) == "" {
 		log.Printf("UpdateCategory: id required")
-		response.BadRequest(w, message.MsgCategoryIDRequired)
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 
@@ -255,14 +211,14 @@ func (h *AdminHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	// Validasi name
 	if strings.TrimSpace(req.Name) == "" {
 		log.Printf("UpdateCategory: name required")
-		response.BadRequest(w, message.MsgCategoryNameRequired)
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 
 	// Validasi panjang name
 	if len(req.Name) > 255 {
 		log.Printf("UpdateCategory: name too long")
-		response.BadRequest(w, message.MsgCategoryNameTooLong)
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 
@@ -279,18 +235,13 @@ func (h *AdminHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.OK(w, input, message.MsgCategoryUpdatedSuccess)
+	response.OK(w, input, message.MsgSuccess)
 }
 
-/*
-Metode untuk menghapus kategori.
-Metode ini menghapus kategori berdasarkan ID melalui layanan.
-*/
 func (h *AdminHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	log.Printf("DeleteCategory: received request")
-	// Cek method DELETE
 	if r.Method != http.MethodDelete {
-		response.BadRequest(w, message.MsgNotAllowed)
+		response.BadRequest(w, message.MsgMethodNotAllowed)
 		return
 	}
 
@@ -298,7 +249,7 @@ func (h *AdminHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	// Validasi ID
 	if strings.TrimSpace(id) == "" {
 		log.Printf("DeleteCategory: id required")
-		response.BadRequest(w, message.MsgCategoryIDRequired)
+		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 
@@ -309,12 +260,56 @@ func (h *AdminHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.OK(w, nil, message.MsgCategoryDeletedSuccess)
+	response.OK(w, nil, message.MsgSuccess)
+}
+
+func (h *AdminHandler) GetAllCategory(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GetCategories: received request")
+	if r.Method != http.MethodGet {
+		response.BadRequest(w, message.MsgMethodNotAllowed)
+		return
+	}
+
+	categories, err := h.service.GetAllCategory()
+	if err != nil {
+		response.BadRequest(w, message.MsgBadRequest)
+		return
+	}
+
+	response.OK(w, categories, message.MsgSuccess)
 }
 
 /*
-Fungsi untuk membuat instance baru dari AdminHandler.
-Instance handler dikembalikan.
+AdminRequest berisi data untuk membuat admin baru.
+Digunakan dalam endpoint pembuatan admin.
+*/
+type AdminRequest struct {
+	FullName string `json:"full_name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+/*
+LoginRequest berisi kredensial untuk autentikasi admin.
+Digunakan dalam endpoint login admin.
+*/
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+/*
+CategoryRequest berisi data untuk operasi kategori.
+Digunakan dalam endpoint CRUD kategori.
+*/
+type CategoryRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+/*
+NewAdminHandler membuat instance baru AdminHandler.
+Mengembalikan pointer ke AdminHandler dengan service yang diberikan.
 */
 func NewAdminHandler(s AdminService) *AdminHandler {
 	return &AdminHandler{service: s}

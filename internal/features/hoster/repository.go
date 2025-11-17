@@ -3,23 +3,24 @@ package hoster
 import (
 	"database/sql"
 	"encoding/json"
-	"lalan-be/internal/model"
 	"log"
 
 	"github.com/jmoiron/sqlx"
+
+	"lalan-be/internal/model"
 )
 
 /*
-Struktur untuk repositori hoster.
-Struktur ini menyediakan akses ke operasi database untuk hoster.
+hosterRespository menyediakan akses database untuk hoster.
+Menggunakan sqlx.DB untuk operasi CRUD.
 */
 type hosterRespository struct {
 	db *sqlx.DB
 }
 
 /*
-Metode untuk membuat hoster baru di database.
-ID dan timestamp hoster dikembalikan setelah penyisipan.
+Methods untuk hosterRespository menangani operasi database hoster, item, dan terms.
+Dipanggil oleh service untuk akses data.
 */
 func (r *hosterRespository) CreateHoster(hoster *model.HosterModel) error {
 	query := `
@@ -45,10 +46,6 @@ func (r *hosterRespository) CreateHoster(hoster *model.HosterModel) error {
 	return err
 }
 
-/*
-Metode untuk mencari hoster berdasarkan email untuk login.
-Model hoster dikembalikan jika ditemukan.
-*/
 func (r *hosterRespository) FindByEmailHosterForLogin(email string) (*model.HosterModel, error) {
 	var hoster model.HosterModel
 	query := `
@@ -82,10 +79,6 @@ func (r *hosterRespository) FindByEmailHosterForLogin(email string) (*model.Host
 	return &hoster, nil
 }
 
-/*
-Metode untuk mengambil detail hoster berdasarkan ID.
-Model hoster dikembalikan jika ditemukan.
-*/
 func (r *hosterRespository) GetDetailHoster(id string) (*model.HosterModel, error) {
 	var hoster model.HosterModel
 	query := `
@@ -120,10 +113,6 @@ func (r *hosterRespository) GetDetailHoster(id string) (*model.HosterModel, erro
 	return &hoster, nil
 }
 
-/*
-Metode untuk membuat item baru di database.
-Item berhasil dibuat atau error dikembalikan.
-*/
 func (r *hosterRespository) CreateItem(item *model.ItemModel) error {
 	photosJSON, err := json.Marshal(item.Photos)
 	if err != nil {
@@ -157,10 +146,6 @@ func (r *hosterRespository) CreateItem(item *model.ItemModel) error {
 	return nil
 }
 
-/*
-Metode untuk mencari item berdasarkan ID.
-Model item dikembalikan jika ditemukan.
-*/
 func (r *hosterRespository) FindItemNameByID(id string) (*model.ItemModel, error) {
 	query := `
 		SELECT
@@ -204,10 +189,6 @@ func (r *hosterRespository) FindItemNameByID(id string) (*model.ItemModel, error
 	return &item, nil
 }
 
-/*
-Metode untuk mencari item berdasarkan nama dan user ID.
-Model item dikembalikan jika ditemukan.
-*/
 func (r *hosterRespository) FindItemNameByUserID(name string, userId string) (*model.ItemModel, error) {
 	query := `
 		SELECT
@@ -251,10 +232,6 @@ func (r *hosterRespository) FindItemNameByUserID(name string, userId string) (*m
 	return &item, nil
 }
 
-/*
-Metode untuk mengambil semua item dari database.
-Daftar model item dikembalikan.
-*/
 func (r *hosterRespository) GetAllItems() ([]*model.ItemModel, error) {
 	query := `
 		SELECT
@@ -295,10 +272,6 @@ func (r *hosterRespository) GetAllItems() ([]*model.ItemModel, error) {
 	return items, nil
 }
 
-/*
-Metode untuk memperbarui item di database.
-Item diperbarui berdasarkan ID.
-*/
 func (r *hosterRespository) UpdateItem(item *model.ItemModel) error {
 	query := `
 		UPDATE item
@@ -328,10 +301,6 @@ func (r *hosterRespository) UpdateItem(item *model.ItemModel) error {
 	return nil
 }
 
-/*
-Metode untuk menghapus item dari database.
-Item dihapus berdasarkan ID.
-*/
 func (r *hosterRespository) DeleteItem(id string) error {
 	query := `DELETE FROM item WHERE id = $1`
 	_, err := r.db.Exec(query, id)
@@ -342,10 +311,6 @@ func (r *hosterRespository) DeleteItem(id string) error {
 	return nil
 }
 
-/*
-Metode untuk membuat terms and conditions baru di database.
-Terms and conditions berhasil dibuat atau error dikembalikan.
-*/
 func (r *hosterRespository) CreateTermsAndConditions(tac *model.TermsAndConditionsModel) error {
 	descriptionJSON, err := json.Marshal(tac.Description)
 	if err != nil {
@@ -369,10 +334,6 @@ func (r *hosterRespository) CreateTermsAndConditions(tac *model.TermsAndConditio
 	return nil
 }
 
-/*
-Metode untuk mencari terms and conditions berdasarkan ID.
-Model terms and conditions dikembalikan jika ditemukan.
-*/
 func (r *hosterRespository) FindTermsAndConditionsByID(id string) (*model.TermsAndConditionsModel, error) {
 	query := `
 		SELECT
@@ -406,10 +367,41 @@ func (r *hosterRespository) FindTermsAndConditionsByID(id string) (*model.TermsA
 	return &tac, nil
 }
 
-/*
-Metode untuk mengambil semua terms and conditions dari database.
-Daftar model terms and conditions dikembalikan.
-*/
+func (r *hosterRespository) FindTermsAndConditionsByUserIDAndDescription(userID string, description []string) (*model.TermsAndConditionsModel, error) {
+	descriptionJSON, err := json.Marshal(description)
+	if err != nil {
+		log.Printf("FindTermsAndConditionsByUserIDAndDescription: error marshaling description: %v", err)
+		return nil, err
+	}
+	query := `
+        SELECT
+            id,
+            user_id,
+            description,
+            created_at,
+            updated_at
+        FROM tnc
+        WHERE user_id = $1 AND description = $2
+        LIMIT 1
+    `
+	var tac model.TermsAndConditionsModel
+	var descJSON []byte
+	err = r.db.QueryRow(query, userID, descriptionJSON).Scan(
+		&tac.ID, &tac.UserID, &descJSON, &tac.CreatedAt, &tac.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		log.Printf("FindTermsAndConditionsByUserIDAndDescription error: %v", err)
+		return nil, err
+	}
+	if err := json.Unmarshal(descJSON, &tac.Description); err != nil {
+		log.Printf("Unmarshal description error: %v", err)
+		return nil, err
+	}
+	return &tac, nil
+}
+
 func (r *hosterRespository) GetAllTermsAndConditions() ([]*model.TermsAndConditionsModel, error) {
 	query := `
 		SELECT
@@ -442,10 +434,6 @@ func (r *hosterRespository) GetAllTermsAndConditions() ([]*model.TermsAndConditi
 	return terms, nil
 }
 
-/*
-Metode untuk memperbarui terms and conditions di database.
-Terms and conditions diperbarui berdasarkan ID.
-*/
 func (r *hosterRespository) UpdateTermsAndConditions(tac *model.TermsAndConditionsModel) error {
 	descriptionJSON, err := json.Marshal(tac.Description)
 	if err != nil {
@@ -467,10 +455,6 @@ func (r *hosterRespository) UpdateTermsAndConditions(tac *model.TermsAndConditio
 	return nil
 }
 
-/*
-Metode untuk menghapus terms and conditions dari database.
-Terms and conditions dihapus berdasarkan ID.
-*/
 func (r *hosterRespository) DeleteTermsAndConditions(id string) error {
 	query := `DELETE FROM tnc WHERE id = $1`
 	_, err := r.db.Exec(query, id)
@@ -482,8 +466,8 @@ func (r *hosterRespository) DeleteTermsAndConditions(id string) error {
 }
 
 /*
-Antarmuka untuk operasi repositori hoster.
-Mendefinisikan metode untuk CRUD hoster.
+HosterRepository mendefinisikan kontrak operasi database hoster.
+Diimplementasikan oleh hosterRespository.
 */
 type HosterRepository interface {
 	CreateHoster(hoster *model.HosterModel) error
@@ -496,15 +480,17 @@ type HosterRepository interface {
 	UpdateItem(item *model.ItemModel) error
 	DeleteItem(id string) error
 	CreateTermsAndConditions(tac *model.TermsAndConditionsModel) error
-	FindTermsAndConditionsByID(id string) (*model.TermsAndConditionsModel, error)
+	FindTermsAndConditionsByID(name string) (*model.TermsAndConditionsModel, error)
 	GetAllTermsAndConditions() ([]*model.TermsAndConditionsModel, error)
 	UpdateTermsAndConditions(tac *model.TermsAndConditionsModel) error
 	DeleteTermsAndConditions(id string) error
+
+	FindTermsAndConditionsByUserIDAndDescription(userID string, description []string) (*model.TermsAndConditionsModel, error)
 }
 
 /*
-Fungsi untuk membuat instance baru dari HosterRepository.
-Instance repositori dikembalikan.
+NewHosterRepository membuat instance HosterRepository.
+Menginisialisasi dengan koneksi database.
 */
 func NewHosterRepository(db *sqlx.DB) HosterRepository {
 	return &hosterRespository{db: db}
