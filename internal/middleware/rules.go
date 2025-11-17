@@ -7,8 +7,8 @@ import (
 )
 
 /*
-Fungsi untuk middleware akses admin.
-Middleware ini memeriksa apakah pengguna memiliki role admin.
+Admin memeriksa akses role admin.
+Melanjutkan jika role admin, forbidden jika tidak.
 */
 func Admin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -23,8 +23,8 @@ func Admin(next http.Handler) http.Handler {
 }
 
 /*
-Fungsi untuk middleware akses hoster.
-Middleware ini memeriksa apakah pengguna memiliki role hoster.
+Hoster memeriksa akses role hoster.
+Melanjutkan jika role hoster, forbidden jika tidak.
 */
 func Hoster(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

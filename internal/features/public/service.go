@@ -1,44 +1,51 @@
 package public
 
 import (
+	"errors"
+
 	"lalan-be/internal/model"
+	"lalan-be/pkg/message"
 )
 
 /*
-Struktur untuk layanan public.
-Struktur ini menyediakan logika bisnis untuk operasi data publik.
+publicService menyediakan logika bisnis untuk data publik.
+Menggunakan repository untuk akses data tanpa autentikasi.
 */
 type publicService struct {
 	repo PublicRepository
 }
 
 /*
-Metode untuk mendapatkan semua kategori.
-Daftar model kategori dikembalikan.
+Methods untuk publicService menangani operasi bisnis kategori, item, dan terms publik.
+Dipanggil oleh handler untuk endpoint umum.
 */
 func (s *publicService) GetAllCategory() ([]*model.CategoryModel, error) {
-	return s.repo.GetAllCategory()
+	categories, err := s.repo.GetAllCategory()
+	if err != nil {
+		return nil, errors.New(message.MsgInternalServerError)
+	}
+	return categories, nil
 }
 
-/*
-Metode untuk mendapatkan semua item.
-Daftar model item dikembalikan.
-*/
 func (s *publicService) GetAllItems() ([]*model.ItemModel, error) {
-	return s.repo.GetAllItems()
+	items, err := s.repo.GetAllItems()
+	if err != nil {
+		return nil, errors.New(message.MsgInternalServerError)
+	}
+	return items, nil
 }
 
-/*
-Metode untuk mendapatkan semua syarat dan ketentuan.
-Daftar model syarat dan ketentuan dikembalikan.
-*/
 func (s *publicService) GetAllTermsAndConditions() ([]*model.TermsAndConditionsModel, error) {
-	return s.repo.GetAllTermsAndConditions()
+	tacs, err := s.repo.GetAllTermsAndConditions()
+	if err != nil {
+		return nil, errors.New(message.MsgInternalServerError)
+	}
+	return tacs, nil
 }
 
 /*
-Antarmuka untuk layanan public.
-Antarmuka ini mendefinisikan metode untuk operasi data publik.
+PublicService mendefinisikan kontrak operasi bisnis publik.
+Diimplementasikan oleh publicService.
 */
 type PublicService interface {
 	GetAllCategory() ([]*model.CategoryModel, error)
@@ -47,8 +54,8 @@ type PublicService interface {
 }
 
 /*
-Fungsi untuk membuat instance baru dari PublicService.
-Instance layanan dikembalikan.
+NewPublicService membuat instance PublicService.
+Menginisialisasi service dengan repository.
 */
 func NewPublicService(repo PublicRepository) PublicService {
 	return &publicService{repo: repo}

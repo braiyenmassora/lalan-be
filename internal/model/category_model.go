@@ -3,8 +3,8 @@ package model
 import "time"
 
 /*
-Struktur untuk model kategori.
-Struktur ini merepresentasikan data kategori dengan field yang diperlukan.
+Merepresentasikan data kategori dengan field yang diperlukan.
+Digunakan untuk serialisasi JSON dan interaksi database.
 */
 type CategoryModel struct {
 	ID          string    `json:"id" db:"id"`

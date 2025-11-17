@@ -1,22 +1,22 @@
-# Declare phony targets to avoid conflicts with files of the same name
+# Menyatakan target phony untuk menghindari konflik dengan file bernama sama
 .PHONY: dev build run clean install-air
 
-# Run development server with hot reload using air
+# Menjalankan server development dengan hot reload menggunakan air
 dev:
 	~/go/bin/air
 
-# Build the application binary to tmp directory
+# Membangun binary aplikasi ke direktori tmp
 build:
 	go build -o ./tmp/main ./cmd/main.go
 
-# Run the application directly without building
+# Menjalankan aplikasi langsung tanpa membangun
 run:
 	go run ./cmd/main.go
 
-# Clean temporary build files and directories
+# Membersihkan file build sementara dan direktori
 clean:
 	rm -rf ./tmp
 
-# Install air tool for hot reload functionality
+# Menginstall tool air untuk fitur hot reload
 install-air:
 	go install github.com/air-verse/air@latest

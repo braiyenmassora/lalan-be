@@ -10,19 +10,28 @@ import (
 )
 
 /*
-Struktur untuk repository public.
-Struktur ini menyediakan akses ke operasi database untuk data publik.
+publicRepository menyediakan akses database untuk data publik.
+Menggunakan sqlx.DB untuk query publik.
 */
 type publicRepository struct {
 	db *sqlx.DB
 }
 
 /*
-Metode untuk mendapatkan semua kategori.
-Daftar model kategori dikembalikan.
+Methods untuk publicRepository menangani query data publik kategori, item, dan terms.
+Dipanggil oleh service untuk akses tanpa autentikasi.
 */
 func (r *publicRepository) GetAllCategory() ([]*model.CategoryModel, error) {
-	query := "SELECT id, name, description, created_at, updated_at FROM category ORDER BY created_at DESC"
+	query := `
+		SELECT
+			id,
+			name,
+			description,
+			created_at,
+			updated_at
+		FROM category
+		ORDER BY created_at DESC
+	`
 	var categories []*model.CategoryModel
 	err := r.db.Select(&categories, query)
 	if err != nil {
@@ -32,10 +41,6 @@ func (r *publicRepository) GetAllCategory() ([]*model.CategoryModel, error) {
 	return categories, nil
 }
 
-/*
-Metode untuk mendapatkan semua item.
-Daftar model item dikembalikan.
-*/
 func (r *publicRepository) GetAllItems() ([]*model.ItemModel, error) {
 	query := `
 		SELECT
@@ -76,10 +81,6 @@ func (r *publicRepository) GetAllItems() ([]*model.ItemModel, error) {
 	return items, nil
 }
 
-/*
-Metode untuk mendapatkan semua syarat dan ketentuan.
-Daftar model syarat dan ketentuan dikembalikan.
-*/
 func (r *publicRepository) GetAllTermsAndConditions() ([]*model.TermsAndConditionsModel, error) {
 	query := `
 		SELECT
@@ -113,8 +114,8 @@ func (r *publicRepository) GetAllTermsAndConditions() ([]*model.TermsAndConditio
 }
 
 /*
-Antarmuka untuk repository public.
-Antarmuka ini mendefinisikan metode untuk operasi data publik.
+PublicRepository mendefinisikan kontrak operasi data publik.
+Diimplementasikan oleh publicRepository.
 */
 type PublicRepository interface {
 	GetAllCategory() ([]*model.CategoryModel, error)
@@ -123,8 +124,8 @@ type PublicRepository interface {
 }
 
 /*
-Fungsi untuk membuat instance baru dari PublicRepository.
-Instance repository dikembalikan.
+NewPublicRepository membuat instance PublicRepository.
+Menginisialisasi repository dengan koneksi database.
 */
 func NewPublicRepository(db *sqlx.DB) PublicRepository {
 	return &publicRepository{db: db}

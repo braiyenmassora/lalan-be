@@ -9,13 +9,25 @@ import (
 
 /*
 Variabel untuk status pemuatan environment.
-Variabel ini menandai apakah environment sudah dimuat.
+Menandai apakah environment sudah dimuat.
 */
 var envLoaded bool
 
 /*
-Fungsi untuk mendapatkan rahasia JWT.
-Rahasia JWT dikembalikan sebagai byte slice.
+GetEnv mengambil nilai environment dengan fallback.
+Mengembalikan nilai atau fallback jika tidak ada.
+*/
+func GetEnv(key, fallback string) string {
+	LoadEnv()
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+/*
+GetJWTSecret mengambil rahasia JWT dari environment.
+Mengembalikan sebagai byte slice dengan fallback default.
 */
 func GetJWTSecret() []byte {
 	secret := GetEnv("JWT_SECRET", "tesingdev")
@@ -23,8 +35,8 @@ func GetJWTSecret() []byte {
 }
 
 /*
-Fungsi untuk memuat environment.
-Environment dimuat dari file jika belum dimuat.
+LoadEnv memuat environment dari file jika belum dimuat.
+Hanya berjalan sekali per aplikasi.
 */
 func LoadEnv() {
 	if envLoaded {
@@ -37,20 +49,8 @@ func LoadEnv() {
 }
 
 /*
-Fungsi untuk mendapatkan nilai environment dengan fallback.
-Nilai environment atau fallback dikembalikan.
-*/
-func GetEnv(key, fallback string) string {
-	LoadEnv()
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
-/*
-Fungsi untuk mendapatkan nilai environment yang wajib.
-Nilai environment dikembalikan atau program dihentikan.
+MustGetEnv mengambil nilai environment yang wajib.
+Menghentikan program jika tidak ada.
 */
 func MustGetEnv(key string) string {
 	LoadEnv()

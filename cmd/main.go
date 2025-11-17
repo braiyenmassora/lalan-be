@@ -9,18 +9,18 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gorilla/mux"
+
 	"lalan-be/internal/config"
 	"lalan-be/internal/features/admin"
 	"lalan-be/internal/features/hoster"
 	"lalan-be/internal/features/public"
 	"lalan-be/internal/middleware"
-
-	"github.com/gorilla/mux"
 )
 
 /*
-Fungsi utama untuk menjalankan aplikasi.
-Aplikasi server diinisialisasi dan dijalankan dengan shutdown yang graceful.
+Main menjalankan aplikasi server.
+Menginisialisasi dan menjalankan dengan shutdown graceful.
 */
 func main() {
 	config.LoadEnv()

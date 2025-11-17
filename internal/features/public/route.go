@@ -5,8 +5,8 @@ import (
 )
 
 /*
-Fungsi untuk mengatur rute fitur publik.
-Router dikonfigurasi dengan rute publik.
+SetupPublicRoutes mengatur rute untuk fitur publik.
+Mendaftarkan endpoint kategori, item, dan terms tanpa autentikasi.
 */
 func SetupPublicRoutes(router *mux.Router, h *PublicHandler) {
 	public := router.PathPrefix("/api/v1/public").Subrouter()
