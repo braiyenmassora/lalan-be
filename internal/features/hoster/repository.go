@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 
@@ -465,6 +466,85 @@ func (r *hosterRespository) DeleteTermsAndConditions(id string) error {
 	return nil
 }
 
+func (r *hosterRespository) GetIdentityCustomer(userID string) (*model.IdentityModel, error) {
+	var identity model.IdentityModel
+	query := `
+        SELECT
+            id,
+            user_id,
+            ktp_url,
+            verified,
+            status,
+            rejected_reason,
+            verified_at,
+            created_at,
+            updated_at
+        FROM identity
+        WHERE user_id = $1
+    `
+	err := r.db.Get(&identity, query, userID)
+	log.Printf("GetIdentityCustomer: query executed for userID %s, err: %v, identity: %+v", userID, err, identity) // Tambahkan log
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("GetIdentityCustomer: no identity found for user %s", userID)
+			return nil, nil
+		}
+		log.Printf("GetIdentityCustomer: error for user %s: %v", userID, err)
+		return nil, err
+	}
+	log.Printf("GetIdentityCustomer: found identity for user %s", userID)
+	return &identity, nil
+}
+
+func (r *hosterRespository) UpdateIdentityStatus(identityID string, status string, rejectedReason string, verified bool, verifiedAt *time.Time) error {
+	query := `
+        UPDATE identity
+        SET
+            status = $1,
+            rejected_reason = $2,
+            verified = $3,
+            verified_at = $4,
+            updated_at = NOW()
+        WHERE id = $5
+    `
+	_, err := r.db.Exec(query, status, rejectedReason, verified, verifiedAt, identityID)
+	if err != nil {
+		log.Printf("UpdateIdentityStatus: error updating identity ID %s: %v", identityID, err)
+		return err
+	}
+	log.Printf("UpdateIdentityStatus: updated identity ID %s to status %s", identityID, status)
+	return nil
+}
+
+func (r *hosterRespository) GetIdentityCustomerByID(identityID string) (*model.IdentityModel, error) {
+	var identity model.IdentityModel
+	query := `
+        SELECT
+            id,
+            user_id,
+            ktp_url,
+            verified,
+            status,
+            rejected_reason,
+            verified_at,
+            created_at,
+            updated_at
+        FROM identity
+        WHERE id = $1
+    `
+	err := r.db.Get(&identity, query, identityID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("GetIdentityCustomerByID: no identity found for ID %s", identityID)
+			return nil, nil
+		}
+		log.Printf("GetIdentityCustomerByID: error for ID %s: %v", identityID, err)
+		return nil, err
+	}
+	log.Printf("GetIdentityCustomerByID: found identity for ID %s", identityID)
+	return &identity, nil
+}
+
 /*
 HosterRepository mendefinisikan kontrak operasi database hoster.
 Diimplementasikan oleh hosterRespository.
@@ -484,8 +564,10 @@ type HosterRepository interface {
 	GetAllTermsAndConditions() ([]*model.TermsAndConditionsModel, error)
 	UpdateTermsAndConditions(tac *model.TermsAndConditionsModel) error
 	DeleteTermsAndConditions(id string) error
-
 	FindTermsAndConditionsByUserIDAndDescription(userID string, description []string) (*model.TermsAndConditionsModel, error)
+	GetIdentityCustomer(userID string) (*model.IdentityModel, error)
+	UpdateIdentityStatus(identityID string, status string, rejectedReason string, verified bool, verifiedAt *time.Time) error
+	GetIdentityCustomerByID(identityID string) (*model.IdentityModel, error) // Tambahkan ini
 }
 
 /*
