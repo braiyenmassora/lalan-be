@@ -421,7 +421,77 @@ func (s *hosterService) UpdateIdentityStatus(ctx context.Context, identityID str
 		return errors.New(message.MsgInternalServerError)
 	}
 
+	// Jika approved atau rejected, update booking identity status
+	if status == "approved" || status == "rejected" {
+		log.Printf("UpdateIdentityStatus: updating booking identity for user %s to %s", identity.UserID, status)
+		err = s.repo.UpdateBookingIdentityStatusByUserID(identity.UserID, status)
+		if err != nil {
+			log.Printf("UpdateIdentityStatus: error updating booking identity status: %v", err)
+			return errors.New(message.MsgInternalServerError)
+		}
+	}
+
 	log.Printf("UpdateIdentityStatus: successfully updated identity %s to status %s", identityID, status)
+	return nil
+}
+
+func (s *hosterService) VerifyIdentity(ctx context.Context, identityID string, status string, rejectionReason string) error {
+	// Ambil ID hoster dari context
+	hosterID, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		log.Printf("VerifyIdentity: unauthorized access")
+		return errors.New(message.MsgUnauthorized)
+	}
+
+	log.Printf("VerifyIdentity: hoster %s verifying identity %s with status %s", hosterID, identityID, status)
+
+	// Validasi status
+	if status != "approved" && status != "rejected" {
+		log.Printf("VerifyIdentity: invalid status %s", status)
+		return errors.New("Invalid status")
+	}
+
+	// Cek apakah identity ada
+	identity, err := s.repo.GetIdentityCustomerByID(identityID)
+	if err != nil {
+		log.Printf("VerifyIdentity: error getting identity %s: %v", identityID, err)
+		return errors.New(message.MsgInternalServerError)
+	}
+	if identity == nil {
+		log.Printf("VerifyIdentity: identity %s not found", identityID)
+		return errors.New("Identity not found")
+	}
+
+	// Hitung verified dan verifiedAt
+	var verified bool
+	var verifiedAt *time.Time
+	if status == "approved" {
+		verified = true
+		now := time.Now()
+		verifiedAt = &now
+	} else {
+		verified = false
+		verifiedAt = nil
+	}
+
+	// Update status
+	err = s.repo.UpdateIdentityStatus(identityID, status, rejectionReason, verified, verifiedAt)
+	if err != nil {
+		log.Printf("VerifyIdentity: error updating identity %s: %v", identityID, err)
+		return errors.New(message.MsgInternalServerError)
+	}
+
+	// Jika approved, update booking identity status
+	if status == "approved" {
+		log.Printf("VerifyIdentity: updating booking identity for user %s", identity.UserID)
+		err = s.repo.UpdateBookingIdentityStatusByUserID(identity.UserID, "approved")
+		if err != nil {
+			log.Printf("VerifyIdentity: error updating booking identity status: %v", err)
+			return errors.New(message.MsgInternalServerError)
+		}
+	}
+
+	log.Printf("VerifyIdentity: successfully updated identity %s to status %s", identityID, status)
 	return nil
 }
 

@@ -84,3 +84,17 @@ const (
 	MsgTnCDescriptionRequired = "Description is required."
 	MsgTnCIDRequired          = "Terms and conditions ID is required."
 )
+
+/*
+Mendefinisikan pesan operasi identity.
+Digunakan dalam upload, get, dan update identity oleh customer dan hoster.
+*/
+const (
+	MsgIdentityUploadedSuccess         = "Identity uploaded successfully."
+	MsgIdentityAlreadyUploaded         = "Identity already uploaded."
+	MsgIdentityNotFound                = "Identity not found."
+	MsgIdentityUpdateSuccess           = "Identity updated successfully."
+	MsgIdentityCanOnlyUpdateIfRejected = "Identity can only be updated if rejected."
+	MsgIdentityStatusUpdatedSuccess    = "Identity status updated successfully."
+	MsgInvalidStatus                   = "Invalid status."
+)
