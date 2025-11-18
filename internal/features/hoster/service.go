@@ -3,6 +3,7 @@ package hoster
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -353,6 +354,77 @@ func (s *hosterService) DeleteTermsAndConditions(ctx context.Context, id string)
 	return s.repo.DeleteTermsAndConditions(id)
 }
 
+func (s *hosterService) GetIdentityCustomer(ctx context.Context, userID string) (*model.IdentityModel, error) {
+	// Ambil ID admin/hoster dari context (untuk otorisasi)
+	adminID, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		return nil, errors.New(message.MsgUnauthorized)
+	}
+
+	log.Printf("GetIdentityCustomer: adminID from context: %s, userID param: %s", adminID, userID) // Tambahkan log
+
+	// Panggil repository
+	identity, err := s.repo.GetIdentityCustomer(userID)
+	if err != nil {
+		return nil, errors.New(message.MsgInternalServerError)
+	}
+	if identity == nil {
+		return nil, errors.New("Identity not found")
+	}
+
+	return identity, nil
+}
+
+func (s *hosterService) UpdateIdentityStatus(ctx context.Context, identityID string, status string, rejectedReason string) error {
+	// Ambil ID hoster dari context
+	hosterID, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		log.Printf("UpdateIdentityStatus: unauthorized access")
+		return errors.New(message.MsgUnauthorized)
+	}
+
+	log.Printf("UpdateIdentityStatus: hoster %s updating identity %s to status %s", hosterID, identityID, status)
+
+	// Validasi status
+	if status != "approved" && status != "rejected" {
+		log.Printf("UpdateIdentityStatus: invalid status %s", status)
+		return errors.New("Invalid status")
+	}
+
+	// Cek apakah identity ada
+	identity, err := s.repo.GetIdentityCustomerByID(identityID)
+	if err != nil {
+		log.Printf("UpdateIdentityStatus: error getting identity %s: %v", identityID, err)
+		return errors.New(message.MsgInternalServerError)
+	}
+	if identity == nil {
+		log.Printf("UpdateIdentityStatus: identity %s not found", identityID)
+		return errors.New("Identity not found")
+	}
+
+	// Hitung verified dan verifiedAt
+	var verified bool
+	var verifiedAt *time.Time
+	if status == "approved" {
+		verified = true
+		now := time.Now()
+		verifiedAt = &now
+	} else {
+		verified = false
+		verifiedAt = nil
+	}
+
+	// Update status
+	err = s.repo.UpdateIdentityStatus(identityID, status, rejectedReason, verified, verifiedAt)
+	if err != nil {
+		log.Printf("UpdateIdentityStatus: error updating identity %s: %v", identityID, err)
+		return errors.New(message.MsgInternalServerError)
+	}
+
+	log.Printf("UpdateIdentityStatus: successfully updated identity %s to status %s", identityID, status)
+	return nil
+}
+
 /*
 HosterResponse berisi data respons autentikasi hoster.
 Digunakan untuk mengembalikan token dan info user.
@@ -383,6 +455,8 @@ type HosterService interface {
 	GetAllTermsAndConditions() ([]*model.TermsAndConditionsModel, error)
 	UpdateTermsAndConditions(ctx context.Context, id string, input *model.TermsAndConditionsModel) (*model.TermsAndConditionsModel, error)
 	DeleteTermsAndConditions(ctx context.Context, id string) error
+	GetIdentityCustomer(ctx context.Context, userID string) (*model.IdentityModel, error)
+	UpdateIdentityStatus(ctx context.Context, identityID string, status string, rejectedReason string) error // Tambahkan ini
 }
 
 /*

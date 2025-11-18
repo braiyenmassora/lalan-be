@@ -13,6 +13,16 @@ const (
 )
 
 /*
+Mendefinisikan pesan akses role.
+Digunakan untuk middleware atau handler yang memvalidasi hak akses.
+*/
+const (
+	MsgAdminAccessRequired    = "Admin access required."
+	MsgHosterAccessRequired   = "Hoster access required."
+	MsgCustomerAccessRequired = "Customer access required."
+)
+
+/*
 Mendefinisikan pesan autentikasi hoster.
 Digunakan dalam handler login dan registrasi hoster.
 */

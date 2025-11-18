@@ -20,6 +20,7 @@ func SetupHosterRoutes(router *mux.Router, handler *HosterHandler) {
 	protected.Use(middleware.Hoster)
 
 	protected.HandleFunc("/detail", handler.GetDetailHoster).Methods("GET")
+	protected.HandleFunc("/identity/{userID}", handler.GetIdentityCustomer).Methods("GET") // Tanpa middleware tambahan jika perlu
 
 	protected.HandleFunc("/item", handler.CreateItem).Methods("POST")
 	protected.HandleFunc("/item", handler.GetAllItems).Methods("GET")
@@ -31,4 +32,6 @@ func SetupHosterRoutes(router *mux.Router, handler *HosterHandler) {
 	protected.HandleFunc("/tnc", handler.GetAllTermsAndConditions).Methods("GET")
 	protected.HandleFunc("/tnc/{id}", handler.UpdateTermsAndConditions).Methods("PUT")
 	protected.HandleFunc("/tnc/{id}", handler.DeleteTermsAndConditions).Methods("DELETE")
+
+	protected.HandleFunc("/verify-identity/{identityID}", handler.UpdateIdentityStatus).Methods("PUT")
 }

@@ -13,6 +13,7 @@ import (
 
 	"lalan-be/internal/config"
 	"lalan-be/internal/features/admin"
+	"lalan-be/internal/features/customer"
 	"lalan-be/internal/features/hoster"
 	"lalan-be/internal/features/public"
 	"lalan-be/internal/middleware"
@@ -39,25 +40,33 @@ func main() {
 	)
 
 	// admin setup
-	aRepo := admin.NewAdminRepository(db)
-	aService := admin.NewAdminService(aRepo)
-	aHandler := admin.NewAdminHandler(aService)
-	// public setup
-	pRepo := public.NewPublicRepository(db)
-	pService := public.NewPublicService(pRepo)
-	pHandler := public.NewPublicHandler(pService)
+	AdminRepo := admin.NewAdminRepository(db)
+	AdminService := admin.NewAdminService(AdminRepo)
+	AdminHandler := admin.NewAdminHandler(AdminService)
+
 	// hoster setup
-	hRepo := hoster.NewHosterRepository(db)
-	hService := hoster.NewHosterService(hRepo)
-	hHandler := hoster.NewHosterHandler(hService)
+	HosterRepo := hoster.NewHosterRepository(db)
+	HosterService := hoster.NewHosterService(HosterRepo)
+	HosterHandler := hoster.NewHosterHandler(HosterService)
+
+	// customer setup
+	CustomerRepo := customer.NewCustomerRepository(db)
+	CustomerService := customer.NewCustomerService(CustomerRepo)
+	CustomerHandler := customer.NewCustomerHandler(CustomerService)
+
+	// public setup
+	PublicRepo := public.NewPublicRepository(db)
+	PublicService := public.NewPublicService(PublicRepo)
+	PublicHandler := public.NewPublicHandler(PublicService)
 
 	router := mux.NewRouter()
 	// Setup CORS Middleware
 	router.Use(middleware.CORSMiddleware)
 
-	admin.SetupAdminRoutes(router, aHandler)
-	hoster.SetupHosterRoutes(router, hHandler)
-	public.SetupPublicRoutes(router, pHandler)
+	admin.SetupAdminRoutes(router, AdminHandler)
+	hoster.SetupHosterRoutes(router, HosterHandler)
+	customer.SetupCustomerRoutes(router, CustomerHandler)
+	public.SetupPublicRoutes(router, PublicHandler)
 
 	srv := &http.Server{
 		Addr:    ":8080",
