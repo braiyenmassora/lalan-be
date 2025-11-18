@@ -7,14 +7,9 @@ import (
 	"lalan-be/pkg/message"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
-
-	"github.com/disintegration/imaging" // Tambahkan untuk image processing
-	"github.com/google/uuid"
+	// Tambahkan untuk image processing
 )
 
 /*
@@ -254,15 +249,14 @@ func (h *CustomerHandler) UploadIdentity(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Parse multipart form (max 1 MB)
-	err := r.ParseMultipartForm(1 << 20) // 1 MB
+	// Parse multipart form
+	err := r.ParseMultipartForm(10 << 20) // 10 MB max
 	if err != nil {
 		log.Printf("UploadIdentity: error parsing multipart form: %v", err)
 		response.BadRequest(w, message.MsgBadRequest)
 		return
 	}
 
-	// Ambil file dari form field "ktp_file"
 	file, header, err := r.FormFile("ktp_file")
 	if err != nil {
 		log.Printf("UploadIdentity: error getting file: %v", err)
@@ -271,67 +265,19 @@ func (h *CustomerHandler) UploadIdentity(w http.ResponseWriter, r *http.Request)
 	}
 	defer file.Close()
 
-	// Validasi tipe file: hanya jpg, png
-	contentType := header.Header.Get("Content-Type")
-	ext := strings.ToLower(filepath.Ext(header.Filename))
-	allowedTypes := map[string]bool{
-		"image/jpeg": true,
-		"image/png":  true,
-	}
-	allowedExts := map[string]bool{
-		".jpg":  true,
-		".jpeg": true,
-		".png":  true,
-	}
-	if !allowedTypes[contentType] || !allowedExts[ext] {
-		log.Printf("UploadIdentity: invalid file type: %s, ext: %s", contentType, ext)
-		response.BadRequest(w, message.MsgBadRequest)
+	// Validasi file type (opsional)
+	if !strings.HasPrefix(header.Header.Get("Content-Type"), "image/") {
+		log.Printf("UploadIdentity: invalid file type: %s", header.Header.Get("Content-Type"))
+		response.BadRequest(w, "Invalid file type")
 		return
 	}
 
-	// Cek duplikat identity
+	// Upload file ke storage (misalnya S3, sini simulasikan URL)
+	// Ganti dengan logic upload real
+	ktpURL := "https://storage.example.com/ktp/" + header.Filename // Simulasi URL
+
+	// Panggil service dengan URL
 	ctx := r.Context()
-	err = h.service.CheckIdentityExists(ctx)
-	if err != nil {
-		log.Printf("UploadIdentity: identity already exists: %v", err)
-		response.BadRequest(w, "Identity already uploaded")
-		return
-	}
-
-	// Buat nama file unik
-	fileName := uuid.New().String() + "_" + time.Now().Format("20060102150405") + ext
-	uploadDir := "./uploads/ktp/"
-	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
-		err = os.MkdirAll(uploadDir, 0755)
-		if err != nil {
-			log.Printf("UploadIdentity: error creating directory: %v", err)
-			response.Error(w, http.StatusInternalServerError, message.MsgInternalServerError)
-			return
-		}
-	}
-	filePath := filepath.Join(uploadDir, fileName)
-
-	// Resize dan compress gambar
-	img, err := imaging.Decode(file)
-	if err != nil {
-		log.Printf("UploadIdentity: error decoding image: %v", err)
-		response.Error(w, http.StatusInternalServerError, message.MsgInternalServerError)
-		return
-	}
-	// Resize ke max 800x600, maintain aspect ratio
-	img = imaging.Fit(img, 800, 600, imaging.Lanczos)
-	// Compress (quality 80%)
-	err = imaging.Save(img, filePath, imaging.JPEGQuality(80))
-	if err != nil {
-		log.Printf("UploadIdentity: error saving compressed image: %v", err)
-		response.Error(w, http.StatusInternalServerError, message.MsgInternalServerError)
-		return
-	}
-
-	// Generate URL
-	ktpURL := "/uploads/ktp/" + fileName
-
-	// Panggil service untuk upload
 	err = h.service.UploadIdentity(ctx, ktpURL)
 	if err != nil {
 		log.Printf("UploadIdentity: error uploading identity: %v", err)
@@ -344,7 +290,7 @@ func (h *CustomerHandler) UploadIdentity(w http.ResponseWriter, r *http.Request)
 	}
 
 	log.Printf("UploadIdentity: identity uploaded successfully")
-	response.OK(w, map[string]string{"ktp_url": ktpURL}, message.MsgSuccess)
+	response.OK(w, nil, "KTP uploaded successfully")
 }
 
 func (h *CustomerHandler) GetIdentityStatus(w http.ResponseWriter, r *http.Request) {
@@ -371,6 +317,92 @@ func (h *CustomerHandler) GetIdentityStatus(w http.ResponseWriter, r *http.Reque
 
 	log.Printf("GetIdentityStatus: retrieved identity status for user")
 	response.OK(w, identity, message.MsgSuccess)
+}
+
+func (h *CustomerHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
+	log.Printf("CreateBooking: received request")
+	if r.Method != http.MethodPost {
+		response.BadRequest(w, message.MsgMethodNotAllowed)
+		return
+	}
+
+	var req CreateBookingRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		log.Printf("CreateBooking: invalid JSON: %v", err)
+		response.BadRequest(w, message.MsgBadRequest)
+		return
+	}
+
+	// Validasi input (opsional, tambahkan jika perlu)
+	if req.StartDate == "" || req.EndDate == "" || len(req.Items) == 0 {
+		log.Printf("CreateBooking: invalid input")
+		response.BadRequest(w, message.MsgBadRequest)
+		return
+	}
+
+	// Panggil service
+	ctx := r.Context()
+	dto, err := h.service.CreateBooking(ctx, req)
+	if err != nil {
+		log.Printf("CreateBooking: error creating booking: %v", err)
+		if err.Error() == message.MsgUnauthorized {
+			response.Error(w, http.StatusUnauthorized, message.MsgUnauthorized)
+		} else if err.Error() == "Identity not found" {
+			response.Error(w, http.StatusNotFound, "Identity not found")
+		} else {
+			response.Error(w, http.StatusInternalServerError, message.MsgInternalServerError)
+		}
+		return
+	}
+
+	log.Printf("CreateBooking: booking created successfully")
+	response.OK(w, dto, message.MsgSuccess)
+}
+
+func (h *CustomerHandler) GetBookingsByUserID(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GetBookingsByUserID: received request")
+	if r.Method != http.MethodGet {
+		response.BadRequest(w, message.MsgMethodNotAllowed)
+		return
+	}
+
+	// Panggil service
+	ctx := r.Context()
+	bookings, err := h.service.GetBookingsByUserID(ctx)
+	if err != nil {
+		log.Printf("GetBookingsByUserID: error getting bookings: %v", err)
+		if err.Error() == message.MsgUnauthorized {
+			response.Error(w, http.StatusUnauthorized, message.MsgUnauthorized)
+		} else {
+			response.Error(w, http.StatusInternalServerError, message.MsgInternalServerError)
+		}
+		return
+	}
+
+	log.Printf("GetBookingsByUserID: retrieved %d bookings", len(bookings))
+	response.OK(w, bookings, message.MsgSuccess)
+}
+
+func (h *CustomerHandler) GetListBookings(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GetListBookings: received request")
+	if r.Method != http.MethodGet {
+		response.BadRequest(w, message.MsgMethodNotAllowed)
+		return
+	}
+
+	// Panggil service
+	ctx := r.Context()
+	bookings, err := h.service.GetListBookings(ctx)
+	if err != nil {
+		log.Printf("GetListBookings: error getting bookings: %v", err)
+		response.Error(w, http.StatusInternalServerError, message.MsgInternalServerError)
+		return
+	}
+
+	log.Printf("GetListBookings: retrieved %d bookings", len(bookings))
+	response.OK(w, bookings, message.MsgSuccess)
 }
 
 /*

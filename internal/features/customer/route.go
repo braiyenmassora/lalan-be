@@ -24,5 +24,7 @@ func SetupCustomerRoutes(router *mux.Router, handler *CustomerHandler) {
 	protected.HandleFunc("/delete", handler.DeleteCustomer).Methods("DELETE")
 	protected.HandleFunc("/upload-identity", handler.UploadIdentity).Methods("POST")
 	protected.HandleFunc("/identity-status", handler.GetIdentityStatus).Methods("GET")
+	protected.HandleFunc("/booking", handler.CreateBooking).Methods("POST")
+	protected.HandleFunc("/booking", handler.GetListBookings).Methods("GET")
 
 }

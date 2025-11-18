@@ -7,6 +7,7 @@ import (
 	"lalan-be/internal/middleware"
 	"lalan-be/internal/model"
 	"lalan-be/pkg/message"
+	"log"
 	"strings"
 	"time"
 
@@ -163,31 +164,49 @@ func (s *customerService) DeleteCustomer(ctx context.Context) error {
 }
 
 func (s *customerService) UploadIdentity(ctx context.Context, ktpURL string) error {
-	// Ambil ID customer dari context (dari JWT token)
 	id, ok := ctx.Value(middleware.UserIDKey).(string)
 	if !ok {
 		return errors.New(message.MsgUnauthorized)
 	}
 
-	// Opsional: Cek apakah customer sudah punya identity (untuk mencegah duplikat)
-	// Jika perlu, tambahkan method di repo untuk cek berdasarkan user_id
-
-	// Buat instance IdentityModel
-	identity := &model.IdentityModel{
-		UserID:         id,
-		KTPURL:         ktpURL,
-		Verified:       false,
-		Status:         "pending",
-		RejectedReason: "",
-		VerifiedAt:     nil,
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
-	}
-
-	// Panggil repository untuk insert
-	err := s.repo.CreateIdentity(identity)
+	// Cek jika identity sudah ada
+	existingIdentity, err := s.repo.GetIdentityByUserID(id)
 	if err != nil {
 		return errors.New(message.MsgInternalServerError)
+	}
+
+	if existingIdentity != nil {
+		// Update existing: replace KTP, reset status
+		existingIdentity.KTPURL = ktpURL
+		existingIdentity.Verified = false
+		existingIdentity.Status = "pending"
+		existingIdentity.RejectedReason = ""
+		existingIdentity.VerifiedAt = nil
+		existingIdentity.UpdatedAt = time.Now()
+		err = s.repo.UpdateIdentity(existingIdentity)
+		if err != nil {
+			return errors.New(message.MsgInternalServerError)
+		}
+		log.Printf("UploadIdentity: updated existing identity for user %s", id)
+	} else {
+		// Create new identity
+		identityID := uuid.New().String()
+		identity := &model.IdentityModel{
+			ID:             identityID,
+			UserID:         id,
+			KTPURL:         ktpURL,
+			Verified:       false,
+			Status:         "pending",
+			RejectedReason: "",
+			VerifiedAt:     nil,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
+		}
+		err = s.repo.CreateIdentity(identity)
+		if err != nil {
+			return errors.New(message.MsgInternalServerError)
+		}
+		log.Printf("UploadIdentity: created new identity for user %s", id)
 	}
 
 	return nil
@@ -230,6 +249,146 @@ func (s *customerService) GetIdentityStatus(ctx context.Context) (*model.Identit
 	return identity, nil
 }
 
+func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRequest) (*model.BookingDetailDTO, error) {
+	id, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		return nil, errors.New(message.MsgUnauthorized)
+	}
+
+	// Cek identity customer
+	identity, err := s.repo.GetIdentityByUserID(id)
+	if err != nil {
+		return nil, errors.New(message.MsgInternalServerError)
+	}
+	if identity == nil {
+		return nil, errors.New("Identity not found")
+	}
+
+	// Hitung total_days
+	start, _ := time.Parse("2006-01-02", req.StartDate)
+	end, _ := time.Parse("2006-01-02", req.EndDate)
+	totalDays := int(end.Sub(start).Hours() / 24)
+
+	// Hitung price
+	var rental, deposit int
+	for _, item := range req.Items {
+		rental += item.SubtotalRental
+		deposit += item.SubtotalDeposit
+	}
+	total := rental + deposit + req.Delivery - req.Discount
+	outstanding := total
+
+	// Generate ID dan code
+	bookingID := uuid.New().String()
+	code := "BK" + time.Now().Format("060102") + uuid.New().String()[:4]
+
+	// Locked until (30 menit)
+	lockedUntil := time.Now().Add(30 * time.Minute)
+
+	// Build models dengan field flat
+	booking := &model.BookingModel{
+		ID:                   bookingID,
+		Code:                 code,
+		LockedUntil:          lockedUntil,
+		TimeRemainingMinutes: 0, // Akan dihitung nanti
+		StartDate:            req.StartDate,
+		EndDate:              req.EndDate,
+		TotalDays:            totalDays,
+		DeliveryType:         req.DeliveryType,
+		Rental:               rental,
+		Deposit:              deposit,
+		Delivery:             req.Delivery,
+		Discount:             req.Discount,
+		Total:                total,
+		Outstanding:          outstanding,
+		UserID:               id,
+		IdentityID:           &identity.ID,
+		CreatedAt:            time.Now(),
+		UpdatedAt:            time.Now(),
+	}
+
+	items := make([]model.BookingItem, len(req.Items))
+	for i, item := range req.Items {
+		items[i] = model.BookingItem{
+			ID:              uuid.New().String(),
+			BookingID:       bookingID,
+			ItemID:          item.ItemID,
+			Name:            item.Name,
+			Quantity:        item.Quantity,
+			PricePerDay:     item.PricePerDay,
+			DepositPerUnit:  item.DepositPerUnit,
+			SubtotalRental:  item.SubtotalRental,
+			SubtotalDeposit: item.SubtotalDeposit,
+		}
+	}
+
+	customer := model.BookingCustomer{
+		ID:              uuid.New().String(),
+		BookingID:       bookingID,
+		Name:            req.Customer.Name,
+		Phone:           req.Customer.Phone,
+		Email:           req.Customer.Email,
+		DeliveryAddress: req.Customer.DeliveryAddress,
+		Notes:           req.Customer.Notes,
+	}
+
+	bookingIdentity := model.BookingIdentity{
+		ID:              uuid.New().String(),
+		BookingID:       bookingID,
+		Uploaded:        true,
+		Status:          identity.Status,
+		RejectionReason: &identity.RejectedReason,
+		ReuploadAllowed: identity.Status == "rejected",
+		EstimatedTime:   "Maksimal 30 menit",
+		StatusCheckURL:  "/api/v1/customer/identity-status",
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+	}
+
+	// Insert
+	err = s.repo.CreateBooking(booking, items, customer, bookingIdentity)
+	if err != nil {
+		return nil, errors.New(message.MsgInternalServerError)
+	}
+
+	// Hitung time_remaining_minutes
+	timeRemaining := int(lockedUntil.Sub(time.Now()).Minutes())
+
+	// Build DTO
+	dto := &model.BookingDetailDTO{
+		Booking:  *booking,
+		Items:    items,
+		Customer: customer,
+		Identity: bookingIdentity,
+	}
+	dto.Booking.TimeRemainingMinutes = timeRemaining
+
+	return dto, nil
+}
+
+func (s *customerService) GetBookingsByUserID(ctx context.Context) ([]model.BookingListDTO, error) {
+	id, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		return nil, errors.New(message.MsgUnauthorized)
+	}
+
+	bookings, err := s.repo.GetBookingsByUserID(id)
+	if err != nil {
+		return nil, errors.New(message.MsgInternalServerError)
+	}
+
+	return bookings, nil
+}
+
+func (s *customerService) GetListBookings(ctx context.Context) ([]model.BookingListDTO, error) {
+	// Opsional: Cek role admin/hoster
+	bookings, err := s.repo.GetListBookings()
+	if err != nil {
+		return nil, errors.New(message.MsgInternalServerError)
+	}
+	return bookings, nil
+}
+
 type CustomerResponse struct {
 	ID           string `json:"id"`
 	AccessToken  string `json:"access_token"`
@@ -246,7 +405,39 @@ type CustomerService interface {
 	DeleteCustomer(ctx context.Context) error
 	UploadIdentity(ctx context.Context, ktpURL string) error
 	CheckIdentityExists(ctx context.Context) error
-	GetIdentityStatus(ctx context.Context) (*model.IdentityModel, error) // Tambahkan ini
+	GetIdentityStatus(ctx context.Context) (*model.IdentityModel, error)
+	CreateBooking(ctx context.Context, req CreateBookingRequest) (*model.BookingDetailDTO, error) // Tambahkan ini
+	GetBookingsByUserID(ctx context.Context) ([]model.BookingListDTO, error)
+	GetListBookings(ctx context.Context) ([]model.BookingListDTO, error) // Rename
+}
+
+// Tambahkan struct request
+type CreateBookingRequest struct {
+	StartDate    string                `json:"start_date"`
+	EndDate      string                `json:"end_date"`
+	DeliveryType string                `json:"delivery_type"`
+	Items        []CreateBookingItem   `json:"items"`
+	Customer     CreateBookingCustomer `json:"customer"`
+	Delivery     int                   `json:"delivery"`
+	Discount     int                   `json:"discount"`
+}
+
+type CreateBookingItem struct {
+	ItemID          string `json:"item_id"`
+	Name            string `json:"name"`
+	Quantity        int    `json:"quantity"`
+	PricePerDay     int    `json:"price_per_day"`
+	DepositPerUnit  int    `json:"deposit_per_unit"`
+	SubtotalRental  int    `json:"subtotal_rental"`
+	SubtotalDeposit int    `json:"subtotal_deposit"`
+}
+
+type CreateBookingCustomer struct {
+	Name            string `json:"name"`
+	Phone           string `json:"phone"`
+	Email           string `json:"email"`
+	DeliveryAddress string `json:"delivery_address"`
+	Notes           string `json:"notes"`
 }
 
 /*

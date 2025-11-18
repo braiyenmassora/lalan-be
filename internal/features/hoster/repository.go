@@ -545,6 +545,38 @@ func (r *hosterRespository) GetIdentityCustomerByID(identityID string) (*model.I
 	return &identity, nil
 }
 
+func (r *hosterRespository) UpdateBookingStatusByUserID(userID, status string) error {
+	query := `UPDATE booking SET status = $1, updated_at = NOW() WHERE user_id = $2 AND status = 'waiting_ktp_verification'`
+	_, err := r.db.Exec(query, status, userID)
+	if err != nil {
+		log.Printf("UpdateBookingStatusByUserID: error updating bookings for user %s: %v", userID, err)
+		return err
+	}
+	log.Printf("UpdateBookingStatusByUserID: updated bookings for user %s to status %s", userID, status)
+	return nil
+}
+
+func (r *hosterRespository) UpdateBookingIdentityStatusByUserID(userID, status string) error {
+	query := `
+        UPDATE booking_identity 
+        SET status = $1, updated_at = NOW() 
+        WHERE booking_id IN (
+            SELECT id FROM booking WHERE user_id = $2
+        )
+    `
+	result, err := r.db.Exec(query, status, userID)
+	if err != nil {
+		log.Printf("UpdateBookingIdentityStatusByUserID: error updating for user %s: %v", userID, err)
+		return err
+	}
+	rowsAffected, _ := result.RowsAffected()
+	log.Printf("UpdateBookingIdentityStatusByUserID: rows affected: %d for user %s to status %s", rowsAffected, userID, status)
+	if rowsAffected == 0 {
+		log.Printf("UpdateBookingIdentityStatusByUserID: no booking identities updated for user %s", userID)
+	}
+	return nil
+}
+
 /*
 HosterRepository mendefinisikan kontrak operasi database hoster.
 Diimplementasikan oleh hosterRespository.
@@ -568,6 +600,8 @@ type HosterRepository interface {
 	GetIdentityCustomer(userID string) (*model.IdentityModel, error)
 	UpdateIdentityStatus(identityID string, status string, rejectedReason string, verified bool, verifiedAt *time.Time) error
 	GetIdentityCustomerByID(identityID string) (*model.IdentityModel, error) // Tambahkan ini
+	UpdateBookingStatusByUserID(userID, status string) error
+	UpdateBookingIdentityStatusByUserID(userID, status string) error
 }
 
 /*
