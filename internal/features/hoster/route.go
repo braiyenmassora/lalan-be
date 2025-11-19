@@ -7,8 +7,8 @@ import (
 )
 
 /*
-SetupHosterRoutes mengatur rute untuk hoster.
-Mendaftarkan endpoint public dan protected dengan middleware.
+SetupHosterRoutes
+mengatur rute untuk fitur hoster dengan middleware
 */
 func SetupHosterRoutes(router *mux.Router, handler *HosterHandler) {
 	public := router.PathPrefix("/api/v1/hoster").Subrouter()

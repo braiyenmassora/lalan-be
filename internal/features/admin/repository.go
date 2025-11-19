@@ -10,18 +10,22 @@ import (
 )
 
 /*
-adminRepository menyediakan akses ke operasi database untuk admin.
-Menggunakan sqlx.DB untuk query dan eksekusi.
+type adminRepository struct
+menyediakan akses ke operasi database untuk admin
 */
 type adminRepository struct {
 	db *sqlx.DB
 }
 
 /*
-Methods adminRepository menangani CRUD admin dan kategori.
-Menggunakan query SQL untuk interaksi database.
+CreateAdmin
+membuat admin baru dengan data yang diberikan
 */
 func (r *adminRepository) CreateAdmin(admin *model.AdminModel) error {
+	/*
+	  CreateAdmin query
+	  membuat admin baru dengan data yang diberikan
+	*/
 	query := `
 		INSERT INTO admin (
 			email,
@@ -37,8 +41,16 @@ func (r *adminRepository) CreateAdmin(admin *model.AdminModel) error {
 	return err
 }
 
+/*
+FindByEmailAdminForLogin
+mencari admin berdasarkan email untuk login
+*/
 func (r *adminRepository) FindByEmailAdminForLogin(email string) (*model.AdminModel, error) {
 	var admin model.AdminModel
+	/*
+	  FindByEmailAdminForLogin query
+	  mencari admin berdasarkan email untuk login
+	*/
 	query := `
 		SELECT
 			id,
@@ -63,7 +75,15 @@ func (r *adminRepository) FindByEmailAdminForLogin(email string) (*model.AdminMo
 	return &admin, nil
 }
 
+/*
+CreateCategory
+membuat kategori baru dengan data yang diberikan
+*/
 func (r *adminRepository) CreateCategory(category *model.CategoryModel) error {
+	/*
+	  CreateCategory query
+	  membuat kategori baru dengan data yang diberikan
+	*/
 	query := `
 		INSERT INTO category (
 			name,
@@ -78,7 +98,15 @@ func (r *adminRepository) CreateCategory(category *model.CategoryModel) error {
 	return err
 }
 
+/*
+UpdateCategory
+memperbarui kategori berdasarkan ID
+*/
 func (r *adminRepository) UpdateCategory(category *model.CategoryModel) error {
+	/*
+	  UpdateCategory query
+	  memperbarui kategori berdasarkan ID
+	*/
 	query := `
 		UPDATE category
 		SET
@@ -92,15 +120,31 @@ func (r *adminRepository) UpdateCategory(category *model.CategoryModel) error {
 	return err
 }
 
+/*
+DeleteCategory
+menghapus kategori berdasarkan ID
+*/
 func (r *adminRepository) DeleteCategory(id string) error {
+	/*
+	  DeleteCategory query
+	  menghapus kategori berdasarkan ID
+	*/
 	query := `DELETE FROM category WHERE id = $1`
 	_, err := r.db.Exec(query, id)
 	log.Printf("DeleteCategory: deleted category with ID %s", id)
 	return err
 }
 
+/*
+FindCategoryByName
+mencari kategori berdasarkan nama
+*/
 func (r *adminRepository) FindCategoryByName(name string) (*model.CategoryModel, error) {
 	var category model.CategoryModel
+	/*
+	  FindCategoryByName query
+	  mencari kategori berdasarkan nama
+	*/
 	query := `
 		SELECT
 			id,
@@ -124,8 +168,16 @@ func (r *adminRepository) FindCategoryByName(name string) (*model.CategoryModel,
 	return &category, nil
 }
 
+/*
+FindCategoryByNameExceptID
+mencari kategori berdasarkan nama kecuali ID tertentu
+*/
 func (r *adminRepository) FindCategoryByNameExceptID(name string, id string) (*model.CategoryModel, error) {
 	var category model.CategoryModel
+	/*
+	  FindCategoryByNameExceptID query
+	  mencari kategori berdasarkan nama kecuali ID tertentu
+	*/
 	query := `
 		SELECT
 			id,
@@ -149,7 +201,15 @@ func (r *adminRepository) FindCategoryByNameExceptID(name string, id string) (*m
 	return &category, nil
 }
 
+/*
+GetAllCategory
+mengambil semua kategori diurutkan berdasarkan waktu pembuatan
+*/
 func (r *adminRepository) GetAllCategory() ([]*model.CategoryModel, error) {
+	/*
+	  GetAllCategory query
+	  mengambil semua kategori diurutkan berdasarkan waktu pembuatan
+	*/
 	query := "SELECT id, name, description, created_at, updated_at FROM category ORDER BY created_at DESC"
 	var categories []*model.CategoryModel
 	err := r.db.Select(&categories, query)
@@ -161,8 +221,8 @@ func (r *adminRepository) GetAllCategory() ([]*model.CategoryModel, error) {
 }
 
 /*
-AdminRepository mendefinisikan kontrak untuk akses data admin dan kategori.
-Wajib diimplementasikan oleh semua penyimpanan data.
+AdminRepository
+mendefinisikan kontrak untuk akses data admin dan kategori
 */
 type AdminRepository interface {
 	CreateAdmin(admin *model.AdminModel) error
@@ -176,8 +236,8 @@ type AdminRepository interface {
 }
 
 /*
-NewAdminRepository membuat instance baru AdminRepository.
-Mengembalikan interface AdminRepository dengan database yang diberikan.
+NewAdminRepository
+membuat instance baru AdminRepository dengan database yang diberikan
 */
 func NewAdminRepository(db *sqlx.DB) AdminRepository {
 	return &adminRepository{db: db}

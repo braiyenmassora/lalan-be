@@ -20,8 +20,8 @@ import (
 )
 
 /*
-Main menjalankan aplikasi server.
-Menginisialisasi dan menjalankan dengan shutdown graceful.
+main
+menjalankan aplikasi server dengan inisialisasi dan shutdown graceful
 */
 func main() {
 	config.LoadEnv()
@@ -39,28 +39,23 @@ func main() {
 		cfg.SSLMode,
 	)
 
-	// admin setup
 	AdminRepo := admin.NewAdminRepository(db)
 	AdminService := admin.NewAdminService(AdminRepo)
 	AdminHandler := admin.NewAdminHandler(AdminService)
 
-	// hoster setup
 	HosterRepo := hoster.NewHosterRepository(db)
 	HosterService := hoster.NewHosterService(HosterRepo)
 	HosterHandler := hoster.NewHosterHandler(HosterService)
 
-	// customer setup
 	CustomerRepo := customer.NewCustomerRepository(db)
 	CustomerService := customer.NewCustomerService(CustomerRepo)
 	CustomerHandler := customer.NewCustomerHandler(CustomerService)
 
-	// public setup
 	PublicRepo := public.NewPublicRepository(db)
 	PublicService := public.NewPublicService(PublicRepo)
 	PublicHandler := public.NewPublicHandler(PublicService)
 
 	router := mux.NewRouter()
-	// Setup CORS Middleware
 	router.Use(middleware.CORSMiddleware)
 
 	admin.SetupAdminRoutes(router, AdminHandler)
@@ -72,7 +67,6 @@ func main() {
 		Addr:    ":8080",
 		Handler: router,
 	}
-	// Graceful shutdown
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {

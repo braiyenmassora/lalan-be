@@ -2,32 +2,33 @@ package admin
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"regexp"
 	"strings"
 
+	"lalan-be/internal/message"
 	"lalan-be/internal/model"
 	"lalan-be/internal/response"
-	"lalan-be/pkg/message"
 )
 
 /*
-AdminHandler menangani permintaan terkait admin.
-Menggunakan service untuk operasi bisnis admin dan kategori.
+type AdminHandler struct
+struct yang menangani permintaan terkait admin dan kategori menggunakan service
 */
 type AdminHandler struct {
 	service AdminService
 }
 
 /*
-Methods AdminHandler mengelola admin dan kategori.
-Menyediakan endpoint untuk CRUD dan autentikasi.
+CreateAdmin
+membuat admin baru dengan validasi input dan response sukses atau error
 */
 func (h *AdminHandler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 	log.Printf("CreateAdmin: received request")
 	if r.Method != http.MethodPost {
-		response.BadRequest(w, message.MsgMethodNotAllowed)
+		response.Error(w, http.StatusMethodNotAllowed, message.MethodNotAllowed)
 		return
 	}
 	var req AdminRequest
@@ -36,28 +37,28 @@ func (h *AdminHandler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 	// Decode JSON
 	if err := decoder.Decode(&req); err != nil {
 		log.Printf("CreateAdmin: invalid JSON: %v", err)
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, message.BadRequest)
 		return
 	}
 
 	// Validasi full name
 	if strings.TrimSpace(req.FullName) == "" {
 		log.Printf("CreateAdmin: full name required")
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, fmt.Sprintf(message.Required, "full name"))
 		return
 	}
 
 	// Validasi email
 	if strings.TrimSpace(req.Email) == "" {
 		log.Printf("CreateAdmin: email required")
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, fmt.Sprintf(message.Required, "email"))
 		return
 	}
 
 	// Validasi password
 	if strings.TrimSpace(req.Password) == "" {
 		log.Printf("CreateAdmin: password required")
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, fmt.Sprintf(message.Required, "password"))
 		return
 	}
 
@@ -70,17 +71,21 @@ func (h *AdminHandler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 	err := h.service.CreateAdmin(input)
 	if err != nil {
 		log.Printf("CreateAdmin: error creating admin: %v", err)
-		response.BadRequest(w, err.Error())
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
 		return
 	}
 
-	response.OK(w, input, message.MsgSuccess)
+	response.OK(w, input, fmt.Sprintf(message.Created, "admin"))
 }
 
+/*
+LoginAdmin
+melakukan login admin dengan validasi kredensial dan response token atau error
+*/
 func (h *AdminHandler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 	log.Printf("LoginAdmin: received request")
 	if r.Method != http.MethodPost {
-		response.BadRequest(w, message.MsgMethodNotAllowed)
+		response.Error(w, http.StatusMethodNotAllowed, message.MethodNotAllowed)
 		return
 	}
 
@@ -90,14 +95,21 @@ func (h *AdminHandler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 	// Decode JSON
 	if err := decoder.Decode(&req); err != nil {
 		log.Printf("LoginAdmin: invalid JSON: %v", err)
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, message.BadRequest)
 		return
 	}
 
-	// Validasi email dan password
-	if req.Email == "" || req.Password == "" {
-		log.Printf("LoginAdmin: email or password empty")
-		response.BadRequest(w, message.MsgBadRequest)
+	// Validasi email
+	if req.Email == "" {
+		log.Printf("LoginAdmin: email required")
+		response.BadRequest(w, fmt.Sprintf(message.Required, "email"))
+		return
+	}
+
+	// Validasi password
+	if req.Password == "" {
+		log.Printf("LoginAdmin: password required")
+		response.BadRequest(w, fmt.Sprintf(message.Required, "password"))
 		return
 	}
 
@@ -105,14 +117,14 @@ func (h *AdminHandler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 	// Validasi format email
 	if !emailRegex.MatchString(req.Email) {
 		log.Printf("LoginAdmin: invalid email format: %s", req.Email)
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, fmt.Sprintf(message.InvalidFormat, "email"))
 		return
 	}
 
 	resp, err := h.service.LoginAdmin(req.Email, req.Password)
 	if err != nil {
 		log.Printf("LoginAdmin: login failed: %v", err)
-		response.Error(w, http.StatusUnauthorized, message.MsgUnauthorized)
+		response.Unauthorized(w, message.LoginFailed)
 		return
 	}
 
@@ -134,13 +146,17 @@ func (h *AdminHandler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 		"expires_in":    resp.ExpiresIn,
 	}
 
-	response.OK(w, userData, message.MsgSuccess)
+	response.OK(w, userData, message.Success)
 }
 
+/*
+CreateCategory
+membuat kategori baru dengan validasi input dan response sukses atau error
+*/
 func (h *AdminHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	log.Printf("CreateCategory: received request")
 	if r.Method != http.MethodPost {
-		response.BadRequest(w, message.MsgMethodNotAllowed)
+		response.Error(w, http.StatusMethodNotAllowed, message.MethodNotAllowed)
 		return
 	}
 
@@ -150,21 +166,21 @@ func (h *AdminHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	// Decode JSON
 	if err := decoder.Decode(&req); err != nil {
 		log.Printf("CreateCategory: invalid JSON: %v", err)
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, message.BadRequest)
 		return
 	}
 
 	// Validasi name
 	if strings.TrimSpace(req.Name) == "" {
 		log.Printf("CreateCategory: name required")
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, fmt.Sprintf(message.Required, "name"))
 		return
 	}
 
 	// Validasi panjang name
 	if len(req.Name) > 255 {
 		log.Printf("CreateCategory: name too long")
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, fmt.Sprintf(message.TooLong, "name"))
 		return
 	}
 
@@ -176,17 +192,21 @@ func (h *AdminHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	err := h.service.CreateCategory(input)
 	if err != nil {
 		log.Printf("CreateCategory: error: %v", err)
-		response.BadRequest(w, err.Error())
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
 		return
 	}
 
-	response.OK(w, input, message.MsgSuccess)
+	response.OK(w, input, fmt.Sprintf(message.Created, "category"))
 }
 
+/*
+UpdateCategory
+memperbarui kategori dengan validasi input dan response sukses atau error
+*/
 func (h *AdminHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	log.Printf("UpdateCategory: received request")
 	if r.Method != http.MethodPut {
-		response.BadRequest(w, message.MsgMethodNotAllowed)
+		response.Error(w, http.StatusMethodNotAllowed, message.MethodNotAllowed)
 		return
 	}
 
@@ -194,7 +214,7 @@ func (h *AdminHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	// Validasi ID
 	if strings.TrimSpace(id) == "" {
 		log.Printf("UpdateCategory: id required")
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, fmt.Sprintf(message.Required, "id"))
 		return
 	}
 
@@ -204,21 +224,21 @@ func (h *AdminHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	// Decode JSON
 	if err := decoder.Decode(&req); err != nil {
 		log.Printf("UpdateCategory: invalid JSON: %v", err)
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, message.BadRequest)
 		return
 	}
 
 	// Validasi name
 	if strings.TrimSpace(req.Name) == "" {
 		log.Printf("UpdateCategory: name required")
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, fmt.Sprintf(message.Required, "name"))
 		return
 	}
 
 	// Validasi panjang name
 	if len(req.Name) > 255 {
 		log.Printf("UpdateCategory: name too long")
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, fmt.Sprintf(message.TooLong, "name"))
 		return
 	}
 
@@ -231,17 +251,21 @@ func (h *AdminHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	err := h.service.UpdateCategory(input)
 	if err != nil {
 		log.Printf("UpdateCategory: error: %v", err)
-		response.BadRequest(w, err.Error())
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
 		return
 	}
 
-	response.OK(w, input, message.MsgSuccess)
+	response.OK(w, input, fmt.Sprintf(message.Updated, "category"))
 }
 
+/*
+DeleteCategory
+menghapus kategori berdasarkan ID dan response sukses atau error
+*/
 func (h *AdminHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	log.Printf("DeleteCategory: received request")
 	if r.Method != http.MethodDelete {
-		response.BadRequest(w, message.MsgMethodNotAllowed)
+		response.Error(w, http.StatusMethodNotAllowed, message.MethodNotAllowed)
 		return
 	}
 
@@ -249,39 +273,44 @@ func (h *AdminHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	// Validasi ID
 	if strings.TrimSpace(id) == "" {
 		log.Printf("DeleteCategory: id required")
-		response.BadRequest(w, message.MsgBadRequest)
+		response.BadRequest(w, fmt.Sprintf(message.Required, "id"))
 		return
 	}
 
 	err := h.service.DeleteCategory(id)
 	if err != nil {
 		log.Printf("DeleteCategory: error: %v", err)
-		response.BadRequest(w, err.Error())
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
 		return
 	}
 
-	response.OK(w, nil, message.MsgSuccess)
+	response.OK(w, nil, fmt.Sprintf(message.Deleted, "category"))
 }
 
+/*
+GetAllCategory
+mengambil semua kategori dan response data atau error
+*/
 func (h *AdminHandler) GetAllCategory(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GetCategories: received request")
 	if r.Method != http.MethodGet {
-		response.BadRequest(w, message.MsgMethodNotAllowed)
+		response.Error(w, http.StatusMethodNotAllowed, message.MethodNotAllowed)
 		return
 	}
 
 	categories, err := h.service.GetAllCategory()
 	if err != nil {
-		response.BadRequest(w, message.MsgBadRequest)
+		log.Printf("GetCategories: error: %v", err)
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
 		return
 	}
 
-	response.OK(w, categories, message.MsgSuccess)
+	response.OK(w, categories, message.Success)
 }
 
 /*
-AdminRequest berisi data untuk membuat admin baru.
-Digunakan dalam endpoint pembuatan admin.
+type AdminRequest struct
+struct yang berisi data untuk membuat admin baru
 */
 type AdminRequest struct {
 	FullName string `json:"full_name"`
@@ -290,8 +319,8 @@ type AdminRequest struct {
 }
 
 /*
-LoginRequest berisi kredensial untuk autentikasi admin.
-Digunakan dalam endpoint login admin.
+type LoginRequest struct
+struct yang berisi kredensial untuk autentikasi admin
 */
 type LoginRequest struct {
 	Email    string `json:"email"`
@@ -299,8 +328,8 @@ type LoginRequest struct {
 }
 
 /*
-CategoryRequest berisi data untuk operasi kategori.
-Digunakan dalam endpoint CRUD kategori.
+type CategoryRequest struct
+struct yang berisi data untuk operasi kategori
 */
 type CategoryRequest struct {
 	Name        string `json:"name"`
@@ -308,8 +337,8 @@ type CategoryRequest struct {
 }
 
 /*
-NewAdminHandler membuat instance baru AdminHandler.
-Mengembalikan pointer ke AdminHandler dengan service yang diberikan.
+NewAdminHandler
+membuat instance baru AdminHandler dengan service yang diberikan
 */
 func NewAdminHandler(s AdminService) *AdminHandler {
 	return &AdminHandler{service: s}

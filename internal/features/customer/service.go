@@ -3,10 +3,7 @@ package customer
 import (
 	"context"
 	"errors"
-	"lalan-be/internal/config"
-	"lalan-be/internal/middleware"
-	"lalan-be/internal/model"
-	"lalan-be/pkg/message"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -14,19 +11,24 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+
+	"lalan-be/internal/config"
+	"lalan-be/internal/message"
+	"lalan-be/internal/middleware"
+	"lalan-be/internal/model"
 )
 
 /*
-hosterService menyediakan logika bisnis untuk hoster.
-Menggunakan repository untuk akses data.
+customerService
+mengelola logika bisnis untuk customer menggunakan repository
 */
 type customerService struct {
 	repo CustomerRepository
 }
 
 /*
-Methods untuk hosterService menangani operasi bisnis hoster, item, dan terms.
-Dipanggil oleh handler untuk validasi dan logika.
+generateTokenCustomer
+menghasilkan JWT token untuk customer
 */
 func (s *customerService) generateTokenCustomer(userID string) (*CustomerResponse, error) {
 	exp := time.Now().Add(1 * time.Hour)
@@ -43,7 +45,7 @@ func (s *customerService) generateTokenCustomer(userID string) (*CustomerRespons
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	accessToken, err := token.SignedString(config.GetJWTSecret())
 	if err != nil {
-		return nil, errors.New(message.MsgInternalServerError)
+		return nil, errors.New(message.InternalError)
 	}
 
 	return &CustomerResponse{
@@ -55,22 +57,31 @@ func (s *customerService) generateTokenCustomer(userID string) (*CustomerRespons
 	}, nil
 }
 
+/*
+LoginCustomer
+memvalidasi login customer dan menghasilkan token
+*/
 func (s *customerService) LoginCustomer(email, password string) (*CustomerResponse, error) {
 	customer, err := s.repo.FindByEmailCustomerForLogin(email)
 	if err != nil || customer == nil {
-		return nil, errors.New(message.MsgUnauthorized)
+		return nil, errors.New(message.Unauthorized)
 	}
 
 	if bcrypt.CompareHashAndPassword([]byte(customer.PasswordHash), []byte(password)) != nil {
-		return nil, errors.New(message.MsgUnauthorized)
+		return nil, errors.New(message.Unauthorized)
 	}
 
 	return s.generateTokenCustomer(customer.ID)
 }
+
+/*
+CreateCustomer
+membuat customer baru dengan hash password
+*/
 func (s *customerService) CreateCustomer(customer *model.CustomerModel) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(customer.PasswordHash), bcrypt.DefaultCost)
 	if err != nil {
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
 	}
 	customer.PasswordHash = string(hash)
 	customer.CreatedAt = time.Now()
@@ -79,104 +90,113 @@ func (s *customerService) CreateCustomer(customer *model.CustomerModel) error {
 	err = s.repo.CreateCustomer(customer)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate") {
-			return errors.New(message.MsgCustomerEmailExists)
+			return errors.New(fmt.Sprintf(message.AlreadyExists, "customer email"))
 		}
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
 	}
 
 	return nil
 }
 
+/*
+GetDetailCustomer
+mengambil detail customer berdasarkan context
+*/
 func (s *customerService) GetDetailCustomer(ctx context.Context) (*model.CustomerModel, error) {
 	id, ok := ctx.Value(middleware.UserIDKey).(string)
 	if !ok {
-		return nil, errors.New(message.MsgUnauthorized)
+		return nil, errors.New(message.Unauthorized)
 	}
 
 	customer, err := s.repo.GetDetailCustomer(id)
 	if err != nil {
-		return nil, errors.New(message.MsgInternalServerError)
+		return nil, errors.New(message.InternalError)
 	}
 	if customer == nil {
-		return nil, errors.New(message.MsgCustomerNotFound)
+		return nil, errors.New(fmt.Sprintf(message.NotFound, "customer"))
 	}
 
 	return customer, nil
 }
 
+/*
+UpdateCustomer
+memperbarui data customer dengan validasi field terbatas
+*/
 func (s *customerService) UpdateCustomer(ctx context.Context, updateData *model.CustomerModel) error {
-	// Ambil ID customer dari context (dari JWT token)
 	id, ok := ctx.Value(middleware.UserIDKey).(string)
 	if !ok {
-		return errors.New(message.MsgUnauthorized)
+		return errors.New(message.Unauthorized)
 	}
 
-	// Validasi: Pastikan hanya field yang diizinkan yang diubah
-	// Ambil data customer yang ada untuk memastikan hanya field tertentu yang diupdate
 	existingCustomer, err := s.repo.GetDetailCustomer(id)
 	if err != nil {
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
 	}
 	if existingCustomer == nil {
-		return errors.New(message.MsgCustomerNotFound)
+		return errors.New(fmt.Sprintf(message.NotFound, "customer"))
 	}
 
-	// Update hanya field yang diizinkan: full_name, phone_number, profile_photo, address
-	// Field lain (seperti email, password_hash) tetap dari existing data
 	existingCustomer.FullName = updateData.FullName
 	existingCustomer.PhoneNumber = updateData.PhoneNumber
 	existingCustomer.ProfilePhoto = updateData.ProfilePhoto
 	existingCustomer.Address = updateData.Address
-	existingCustomer.UpdatedAt = time.Now() // Set waktu update sekarang
+	existingCustomer.UpdatedAt = time.Now()
 
-	// Panggil repository untuk update
 	err = s.repo.UpdateCustomer(existingCustomer)
 	if err != nil {
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
 	}
 
 	return nil
 }
 
+/*
+DeleteCustomer
+menghapus customer berdasarkan context
+*/
 func (s *customerService) DeleteCustomer(ctx context.Context) error {
-	// Ambil ID customer dari context (dari JWT token)
 	id, ok := ctx.Value(middleware.UserIDKey).(string)
 	if !ok {
-		return errors.New(message.MsgUnauthorized)
+		return errors.New(message.Unauthorized)
 	}
 
-	// Opsional: Validasi apakah customer ada sebelum delete
 	existingCustomer, err := s.repo.GetDetailCustomer(id)
 	if err != nil {
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
 	}
 	if existingCustomer == nil {
-		return errors.New(message.MsgCustomerNotFound)
+		return errors.New(fmt.Sprintf(message.NotFound, "customer"))
 	}
 
-	// Panggil repository untuk delete
 	err = s.repo.DeleteCustomer(id)
 	if err != nil {
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
 	}
 
 	return nil
 }
 
+/*
+UploadIdentity
+mengunggah atau memperbarui identitas customer
+*/
 func (s *customerService) UploadIdentity(ctx context.Context, ktpURL string) error {
 	id, ok := ctx.Value(middleware.UserIDKey).(string)
 	if !ok {
-		return errors.New(message.MsgUnauthorized)
+		return errors.New(message.Unauthorized)
 	}
 
-	// Cek jika identity sudah ada
 	existingIdentity, err := s.repo.GetIdentityByUserID(id)
 	if err != nil {
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
+	}
+
+	if existingIdentity != nil && existingIdentity.Status == "approved" {
+		return errors.New(message.IdentityAlreadyUploaded)
 	}
 
 	if existingIdentity != nil {
-		// Update existing: replace KTP, reset status
 		existingIdentity.KTPURL = ktpURL
 		existingIdentity.Verified = false
 		existingIdentity.Status = "pending"
@@ -185,11 +205,10 @@ func (s *customerService) UploadIdentity(ctx context.Context, ktpURL string) err
 		existingIdentity.UpdatedAt = time.Now()
 		err = s.repo.UpdateIdentity(existingIdentity)
 		if err != nil {
-			return errors.New(message.MsgInternalServerError)
+			return errors.New(message.InternalError)
 		}
 		log.Printf("UploadIdentity: updated existing identity for user %s", id)
 	} else {
-		// Create new identity
 		identityID := uuid.New().String()
 		identity := &model.IdentityModel{
 			ID:             identityID,
@@ -204,7 +223,10 @@ func (s *customerService) UploadIdentity(ctx context.Context, ktpURL string) err
 		}
 		err = s.repo.CreateIdentity(identity)
 		if err != nil {
-			return errors.New(message.MsgInternalServerError)
+			if strings.Contains(err.Error(), "identity already approved") {
+				return errors.New(message.IdentityAlreadyUploaded)
+			}
+			return errors.New(message.InternalError)
 		}
 		log.Printf("UploadIdentity: created new identity for user %s", id)
 	}
@@ -212,64 +234,102 @@ func (s *customerService) UploadIdentity(ctx context.Context, ktpURL string) err
 	return nil
 }
 
-func (s *customerService) CheckIdentityExists(ctx context.Context) error {
-	// Ambil ID customer dari context
+/*
+UpdateIdentity
+memperbarui identitas customer dengan upload KTP baru
+*/
+func (s *customerService) UpdateIdentity(ctx context.Context, ktpURL string) error {
 	id, ok := ctx.Value(middleware.UserIDKey).(string)
 	if !ok {
-		return errors.New(message.MsgUnauthorized)
+		return errors.New(message.Unauthorized)
 	}
 
-	// Cek apakah identity sudah ada
+	existingIdentity, err := s.repo.GetIdentityByUserID(id)
+	if err != nil {
+		return errors.New(message.InternalError)
+	}
+	if existingIdentity == nil {
+		return errors.New(fmt.Sprintf(message.NotFound, "identity"))
+	}
+
+	existingIdentity.KTPURL = ktpURL
+	existingIdentity.Verified = false
+	existingIdentity.Status = "pending"
+	existingIdentity.RejectedReason = ""
+	existingIdentity.VerifiedAt = nil
+	existingIdentity.UpdatedAt = time.Now()
+
+	err = s.repo.UpdateIdentity(existingIdentity)
+	if err != nil {
+		return errors.New(message.InternalError)
+	}
+	log.Printf("UpdateIdentity: updated identity for user %s", id)
+	return nil
+}
+
+/*
+CheckIdentityExists
+memeriksa apakah identitas customer sudah ada
+*/
+func (s *customerService) CheckIdentityExists(ctx context.Context) error {
+	id, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		return errors.New(message.Unauthorized)
+	}
+
 	exists, err := s.repo.CheckIdentityExists(id)
 	if err != nil {
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
 	}
 	if exists {
-		return errors.New("Identity already exists")
+		return errors.New(message.IdentityAlreadyUploaded)
 	}
 	return nil
 }
 
+/*
+GetIdentityStatus
+mengambil status identitas customer
+*/
 func (s *customerService) GetIdentityStatus(ctx context.Context) (*model.IdentityModel, error) {
-	// Ambil ID customer dari context
 	id, ok := ctx.Value(middleware.UserIDKey).(string)
 	if !ok {
-		return nil, errors.New(message.MsgUnauthorized)
+		return nil, errors.New(message.Unauthorized)
 	}
 
-	// Panggil repository
 	identity, err := s.repo.GetIdentityByUserID(id)
 	if err != nil {
-		return nil, errors.New(message.MsgInternalServerError)
+		return nil, errors.New(message.InternalError)
 	}
 	if identity == nil {
-		return nil, errors.New("Identity not found")
+		return nil, errors.New(fmt.Sprintf(message.NotFound, "identity"))
 	}
 
 	return identity, nil
 }
 
+/*
+CreateBooking
+membuat booking baru dan mengembalikan detail booking
+*/
 func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRequest) (*model.BookingDetailDTO, error) {
 	id, ok := ctx.Value(middleware.UserIDKey).(string)
 	if !ok {
-		return nil, errors.New(message.MsgUnauthorized)
+		return nil, errors.New(message.Unauthorized)
 	}
 
-	// Cek identity customer
 	identity, err := s.repo.GetIdentityByUserID(id)
 	if err != nil {
-		return nil, errors.New(message.MsgInternalServerError)
+		return nil, errors.New(message.InternalError)
 	}
 	if identity == nil {
-		return nil, errors.New("Identity not found")
+		return nil, errors.New(fmt.Sprintf(message.NotFound, "identity"))
 	}
 
-	// Hitung total_days
 	start, _ := time.Parse("2006-01-02", req.StartDate)
 	end, _ := time.Parse("2006-01-02", req.EndDate)
 	totalDays := int(end.Sub(start).Hours() / 24)
 
-	// Hitung price
 	var rental, deposit int
 	for _, item := range req.Items {
 		rental += item.SubtotalRental
@@ -278,19 +338,16 @@ func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRe
 	total := rental + deposit + req.Delivery - req.Discount
 	outstanding := total
 
-	// Generate ID dan code
 	bookingID := uuid.New().String()
 	code := "BK" + time.Now().Format("060102") + uuid.New().String()[:4]
 
-	// Locked until (30 menit)
 	lockedUntil := time.Now().Add(30 * time.Minute)
 
-	// Build models dengan field flat
 	booking := &model.BookingModel{
 		ID:                   bookingID,
 		Code:                 code,
 		LockedUntil:          lockedUntil,
-		TimeRemainingMinutes: 0, // Akan dihitung nanti
+		TimeRemainingMinutes: 0,
 		StartDate:            req.StartDate,
 		EndDate:              req.EndDate,
 		TotalDays:            totalDays,
@@ -305,6 +362,16 @@ func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRe
 		IdentityID:           &identity.ID,
 		CreatedAt:            time.Now(),
 		UpdatedAt:            time.Now(),
+	}
+
+	// Set hoster_id from the first item if not set
+	if booking.HosterID == "" && len(req.Items) > 0 {
+		hosterID, err := s.repo.GetHosterIDByItemID(req.Items[0].ItemID)
+		if err != nil {
+			log.Printf("CreateBooking: error getting hoster_id: %v", err)
+			return nil, errors.New(message.InternalError)
+		}
+		booking.HosterID = hosterID
 	}
 
 	items := make([]model.BookingItem, len(req.Items))
@@ -345,50 +412,74 @@ func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRe
 		UpdatedAt:       time.Now(),
 	}
 
-	// Insert
-	err = s.repo.CreateBooking(booking, items, customer, bookingIdentity)
+	detail, err := s.repo.CreateBooking(booking, items, customer, bookingIdentity)
 	if err != nil {
-		return nil, errors.New(message.MsgInternalServerError)
+		return nil, errors.New(message.InternalError)
 	}
 
-	// Hitung time_remaining_minutes
-	timeRemaining := int(lockedUntil.Sub(time.Now()).Minutes())
-
-	// Build DTO
-	dto := &model.BookingDetailDTO{
-		Booking:  *booking,
-		Items:    items,
-		Customer: customer,
-		Identity: bookingIdentity,
-	}
-	dto.Booking.TimeRemainingMinutes = timeRemaining
-
-	return dto, nil
+	return detail, nil
 }
 
+/*
+GetBookingsByUserID
+mengambil daftar booking berdasarkan user ID
+*/
 func (s *customerService) GetBookingsByUserID(ctx context.Context) ([]model.BookingListDTO, error) {
 	id, ok := ctx.Value(middleware.UserIDKey).(string)
 	if !ok {
-		return nil, errors.New(message.MsgUnauthorized)
+		return nil, errors.New(message.Unauthorized)
 	}
 
 	bookings, err := s.repo.GetBookingsByUserID(id)
 	if err != nil {
-		return nil, errors.New(message.MsgInternalServerError)
+		return nil, errors.New(message.InternalError)
 	}
 
 	return bookings, nil
 }
 
+/*
+GetListBookings
+mengambil daftar semua booking
+*/
 func (s *customerService) GetListBookings(ctx context.Context) ([]model.BookingListDTO, error) {
-	// Opsional: Cek role admin/hoster
 	bookings, err := s.repo.GetListBookings()
 	if err != nil {
-		return nil, errors.New(message.MsgInternalServerError)
+		return nil, errors.New(message.InternalError)
 	}
 	return bookings, nil
 }
 
+/*
+GetDetailBooking
+mengambil detail booking berdasarkan booking ID dengan validasi kepemilikan
+*/
+func (s *customerService) GetDetailBooking(ctx context.Context, bookingID string) (*model.BookingDetailDTO, error) {
+	id, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		return nil, errors.New(message.Unauthorized)
+	}
+
+	bookingDetail, err := s.repo.GetBookingDetail(bookingID)
+	if err != nil {
+		return nil, errors.New(message.InternalError)
+	}
+	if bookingDetail == nil {
+		return nil, errors.New(fmt.Sprintf(message.NotFound, "booking"))
+	}
+
+	// Validasi bahwa booking milik user yang sedang login
+	if bookingDetail.Booking.UserID != id {
+		return nil, errors.New(message.Unauthorized)
+	}
+
+	return bookingDetail, nil
+}
+
+/*
+CustomerResponse
+format response untuk data customer dengan token
+*/
 type CustomerResponse struct {
 	ID           string `json:"id"`
 	AccessToken  string `json:"access_token"`
@@ -397,6 +488,21 @@ type CustomerResponse struct {
 	ExpiresIn    int    `json:"expires_in"`
 }
 
+/*
+CreateBookingResponse
+format response untuk membuat booking
+*/
+type CreateBookingResponse struct {
+	Code    int                    `json:"code"`
+	Data    model.BookingDetailDTO `json:"data"`
+	Message string                 `json:"message"`
+	Success bool                   `json:"success"`
+}
+
+/*
+CustomerService
+interface untuk operasi service customer
+*/
 type CustomerService interface {
 	LoginCustomer(email, password string) (*CustomerResponse, error)
 	CreateCustomer(customer *model.CustomerModel) error
@@ -404,14 +510,19 @@ type CustomerService interface {
 	UpdateCustomer(ctx context.Context, updateData *model.CustomerModel) error
 	DeleteCustomer(ctx context.Context) error
 	UploadIdentity(ctx context.Context, ktpURL string) error
+	UpdateIdentity(ctx context.Context, ktpURL string) error
 	CheckIdentityExists(ctx context.Context) error
 	GetIdentityStatus(ctx context.Context) (*model.IdentityModel, error)
-	CreateBooking(ctx context.Context, req CreateBookingRequest) (*model.BookingDetailDTO, error) // Tambahkan ini
+	CreateBooking(ctx context.Context, req CreateBookingRequest) (*model.BookingDetailDTO, error)
 	GetBookingsByUserID(ctx context.Context) ([]model.BookingListDTO, error)
-	GetListBookings(ctx context.Context) ([]model.BookingListDTO, error) // Rename
+	GetListBookings(ctx context.Context) ([]model.BookingListDTO, error)
+	GetDetailBooking(ctx context.Context, bookingID string) (*model.BookingDetailDTO, error)
 }
 
-// Tambahkan struct request
+/*
+CreateBookingRequest
+berisi data untuk membuat booking baru
+*/
 type CreateBookingRequest struct {
 	StartDate    string                `json:"start_date"`
 	EndDate      string                `json:"end_date"`
@@ -422,6 +533,10 @@ type CreateBookingRequest struct {
 	Discount     int                   `json:"discount"`
 }
 
+/*
+CreateBookingItem
+berisi data item dalam booking
+*/
 type CreateBookingItem struct {
 	ItemID          string `json:"item_id"`
 	Name            string `json:"name"`
@@ -432,6 +547,10 @@ type CreateBookingItem struct {
 	SubtotalDeposit int    `json:"subtotal_deposit"`
 }
 
+/*
+CreateBookingCustomer
+berisi data customer dalam booking
+*/
 type CreateBookingCustomer struct {
 	Name            string `json:"name"`
 	Phone           string `json:"phone"`
@@ -441,8 +560,8 @@ type CreateBookingCustomer struct {
 }
 
 /*
-NewCustomerService membuat instance CustomerService.
-Menginisialisasi service dengan repository.
+NewCustomerService
+membuat instance CustomerService dengan repository
 */
 func NewCustomerService(repo CustomerRepository) CustomerService {
 	return &customerService{repo: repo}

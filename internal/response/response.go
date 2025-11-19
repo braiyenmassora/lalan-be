@@ -6,8 +6,8 @@ import (
 )
 
 /*
-Mewakili struktur respons API standar.
-Digunakan untuk format JSON respons sukses atau error.
+Response
+struct standar untuk respons API
 */
 type Response struct {
 	Code    int    `json:"code"`
@@ -17,13 +17,21 @@ type Response struct {
 }
 
 /*
-Mengirim respons bad request dengan pesan error.
-Mengembalikan status 400 dan JSON error.
+writeJSON
+helper untuk menulis respons JSON
+*/
+func writeJSON(w http.ResponseWriter, status int, resp Response) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+/*
+BadRequest
+mengirim respons bad request 400
 */
 func BadRequest(w http.ResponseWriter, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusBadRequest)
-	json.NewEncoder(w).Encode(Response{
+	writeJSON(w, http.StatusBadRequest, Response{
 		Code:    http.StatusBadRequest,
 		Message: msg,
 		Success: false,
@@ -31,66 +39,58 @@ func BadRequest(w http.ResponseWriter, msg string) {
 }
 
 /*
-Mengirim respons error dengan kode dan pesan.
-Mengembalikan JSON dengan success false.
+Error
+mengirim respons error dengan kode tertentu
 */
-func Error(w http.ResponseWriter, code int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(Response{
+func Error(w http.ResponseWriter, code int, msg string) {
+	writeJSON(w, code, Response{
 		Code:    code,
-		Message: message,
+		Message: msg,
 		Success: false,
 	})
 }
 
 /*
-Mengirim respons forbidden dengan pesan.
-Mengembalikan status 403 dan JSON error.
+Forbidden
+mengirim respons forbidden 403
 */
-func Forbidden(w http.ResponseWriter, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusForbidden)
-	json.NewEncoder(w).Encode(Response{
+func Forbidden(w http.ResponseWriter, msg string) {
+	writeJSON(w, http.StatusForbidden, Response{
 		Code:    http.StatusForbidden,
-		Message: message,
+		Message: msg,
 		Success: false,
 	})
 }
 
 /*
-Mengirim respons OK dengan data dan pesan.
-Mengembalikan status 200 dan JSON sukses.
+Unauthorized
+mengirim respons unauthorized 401
+*/
+func Unauthorized(w http.ResponseWriter, msg string) {
+	writeJSON(w, http.StatusUnauthorized, Response{
+		Code:    http.StatusUnauthorized,
+		Message: msg,
+		Success: false,
+	})
+}
+
+/*
+OK
+mengirim respons sukses 200
 */
 func OK(w http.ResponseWriter, data any, msg string) {
 	Success(w, http.StatusOK, data, msg)
 }
 
 /*
-Mengirim respons sukses dengan kode, data, dan pesan.
-Mengembalikan JSON dengan success true.
+Success
+mengirim respons sukses dengan kode tertentu
 */
-func Success(w http.ResponseWriter, code int, data any, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(Response{
+func Success(w http.ResponseWriter, code int, data any, msg string) {
+	writeJSON(w, code, Response{
 		Code:    code,
 		Data:    data,
-		Message: message,
-		Success: true,
-	})
-}
-
-/*
-Mengirim respons unauthorized dengan pesan.
-Mengembalikan status 401 dan JSON error.
-*/
-func Unauthorized(w http.ResponseWriter, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusUnauthorized)
-	json.NewEncoder(w).Encode(Response{
-		Code:    http.StatusUnauthorized,
 		Message: msg,
-		Success: false,
+		Success: true,
 	})
 }

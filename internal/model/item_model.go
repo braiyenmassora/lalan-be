@@ -3,8 +3,8 @@ package model
 import "time"
 
 /*
-Mendefinisikan metode pengambilan item yang tersedia.
-Digunakan dalam validasi dan pemilihan cara pengambilan.
+PickupMethod
+konstanta untuk metode pengambilan item
 */
 const (
 	PickupMethodSelfPickup PickupMethod = "pickup"
@@ -12,14 +12,14 @@ const (
 )
 
 /*
-Mewakili tipe metode pengambilan item.
-Digunakan untuk menentukan cara pengambilan dalam model item.
+PickupMethod
+type untuk metode pengambilan item
 */
 type PickupMethod string
 
 /*
-Merepresentasikan data item dengan field yang diperlukan.
-Digunakan untuk serialisasi JSON dan interaksi database.
+ItemModel
+struct untuk data item dengan field JSON dan database
 */
 type ItemModel struct {
 	ID          string       `json:"id" db:"id"`
@@ -33,8 +33,6 @@ type ItemModel struct {
 	Discount    int          `json:"discount,omitempty" db:"discount"`
 	CreatedAt   time.Time    `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time    `json:"updated_at" db:"updated_at"`
-
-	// Foreign key
-	CategoryID string `json:"category_id" db:"category_id"`
-	UserID     string `json:"user_id" db:"user_id"`
+	CategoryID  string       `json:"category_id" db:"category_id"`
+	UserID      string       `json:"user_id" db:"user_id"`
 }

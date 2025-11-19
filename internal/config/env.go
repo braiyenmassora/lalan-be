@@ -8,14 +8,14 @@ import (
 )
 
 /*
-Variabel untuk status pemuatan environment.
-Menandai apakah environment sudah dimuat.
+envLoaded
+variabel boolean yang menandai apakah environment sudah dimuat
 */
 var envLoaded bool
 
 /*
-GetEnv mengambil nilai environment dengan fallback.
-Mengembalikan nilai atau fallback jika tidak ada.
+GetEnv
+mengambil nilai environment dengan fallback jika tidak ada
 */
 func GetEnv(key, fallback string) string {
 	LoadEnv()
@@ -26,8 +26,8 @@ func GetEnv(key, fallback string) string {
 }
 
 /*
-GetJWTSecret mengambil rahasia JWT dari environment.
-Mengembalikan sebagai byte slice dengan fallback default.
+GetJWTSecret
+mengambil rahasia JWT sebagai byte slice dengan fallback default
 */
 func GetJWTSecret() []byte {
 	secret := GetEnv("JWT_SECRET", "tesingdev")
@@ -35,8 +35,8 @@ func GetJWTSecret() []byte {
 }
 
 /*
-LoadEnv memuat environment dari file jika belum dimuat.
-Hanya berjalan sekali per aplikasi.
+LoadEnv
+memuat environment dari file jika belum dimuat, hanya sekali per aplikasi
 */
 func LoadEnv() {
 	if envLoaded {
@@ -49,14 +49,14 @@ func LoadEnv() {
 }
 
 /*
-MustGetEnv mengambil nilai environment yang wajib.
-Menghentikan program jika tidak ada.
+MustGetEnv
+mengambil nilai environment wajib dan menghentikan program jika tidak ada
 */
 func MustGetEnv(key string) string {
 	LoadEnv()
 	v := os.Getenv(key)
 	if v == "" {
-		log.Fatalf("Missing required environment variable: %s", key)
+		log.Fatalf("missing required environment variable: %s", key)
 	}
 	return v
 }

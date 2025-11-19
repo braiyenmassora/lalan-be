@@ -7,8 +7,8 @@ import (
 )
 
 /*
-SetupAdminRoutes mengatur rute untuk fitur admin.
-Menggunakan mux.Router dengan middleware untuk endpoint publik dan terproteksi.
+SetupAdminRoutes
+mengatur rute untuk fitur admin dengan middleware
 */
 func SetupAdminRoutes(router *mux.Router, h *AdminHandler) {
 	admin := router.PathPrefix("/api/v1/admin").Subrouter()
