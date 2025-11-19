@@ -3,8 +3,8 @@ package model
 import "time"
 
 /*
-Merepresentasikan data hoster dengan field yang diperlukan.
-Digunakan untuk serialisasi JSON dan interaksi database.
+HosterModel
+struct untuk data hoster dengan field JSON dan database
 */
 type HosterModel struct {
 	ID           string    `json:"id" db:"id"`

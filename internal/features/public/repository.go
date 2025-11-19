@@ -4,22 +4,22 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/jmoiron/sqlx"
-
 	"lalan-be/internal/model"
+
+	"github.com/jmoiron/sqlx"
 )
 
 /*
-publicRepository menyediakan akses database untuk data publik.
-Menggunakan sqlx.DB untuk query publik.
+publicRepository
+mengelola akses database untuk data publik
 */
 type publicRepository struct {
 	db *sqlx.DB
 }
 
 /*
-Methods untuk publicRepository menangani query data publik kategori, item, dan terms.
-Dipanggil oleh service untuk akses tanpa autentikasi.
+GetAllCategory
+mengambil semua kategori dari database
 */
 func (r *publicRepository) GetAllCategory() ([]*model.CategoryModel, error) {
 	query := `
@@ -41,6 +41,10 @@ func (r *publicRepository) GetAllCategory() ([]*model.CategoryModel, error) {
 	return categories, nil
 }
 
+/*
+GetAllItems
+mengambil semua item dari database dengan unmarshal JSON
+*/
 func (r *publicRepository) GetAllItems() ([]*model.ItemModel, error) {
 	query := `
 		SELECT
@@ -81,6 +85,10 @@ func (r *publicRepository) GetAllItems() ([]*model.ItemModel, error) {
 	return items, nil
 }
 
+/*
+GetAllTermsAndConditions
+mengambil semua syarat dan ketentuan dari database dengan unmarshal JSON
+*/
 func (r *publicRepository) GetAllTermsAndConditions() ([]*model.TermsAndConditionsModel, error) {
 	query := `
 		SELECT
@@ -114,8 +122,8 @@ func (r *publicRepository) GetAllTermsAndConditions() ([]*model.TermsAndConditio
 }
 
 /*
-PublicRepository mendefinisikan kontrak operasi data publik.
-Diimplementasikan oleh publicRepository.
+PublicRepository
+interface untuk operasi repository publik
 */
 type PublicRepository interface {
 	GetAllCategory() ([]*model.CategoryModel, error)
@@ -124,8 +132,8 @@ type PublicRepository interface {
 }
 
 /*
-NewPublicRepository membuat instance PublicRepository.
-Menginisialisasi repository dengan koneksi database.
+NewPublicRepository
+membuat instance PublicRepository dengan database
 */
 func NewPublicRepository(db *sqlx.DB) PublicRepository {
 	return &publicRepository{db: db}

@@ -12,18 +12,22 @@ import (
 )
 
 /*
-hosterRespository menyediakan akses database untuk hoster.
-Menggunakan sqlx.DB untuk operasi CRUD.
+type hosterRespository struct
+menyediakan akses ke operasi database untuk hoster
 */
 type hosterRespository struct {
 	db *sqlx.DB
 }
 
 /*
-Methods untuk hosterRespository menangani operasi database hoster, item, dan terms.
-Dipanggil oleh service untuk akses data.
+CreateHoster
+membuat hoster baru dengan data yang diberikan
 */
 func (r *hosterRespository) CreateHoster(hoster *model.HosterModel) error {
+	/*
+	  CreateHoster query
+	  membuat hoster baru dengan data yang diberikan
+	*/
 	query := `
 		INSERT INTO hoster (
 			full_name,
@@ -47,8 +51,16 @@ func (r *hosterRespository) CreateHoster(hoster *model.HosterModel) error {
 	return err
 }
 
+/*
+FindByEmailHosterForLogin
+mencari hoster berdasarkan email untuk login
+*/
 func (r *hosterRespository) FindByEmailHosterForLogin(email string) (*model.HosterModel, error) {
 	var hoster model.HosterModel
+	/*
+	  FindByEmailHosterForLogin query
+	  mencari hoster berdasarkan email untuk login
+	*/
 	query := `
 		SELECT
 			id,
@@ -80,8 +92,16 @@ func (r *hosterRespository) FindByEmailHosterForLogin(email string) (*model.Host
 	return &hoster, nil
 }
 
+/*
+GetDetailHoster
+mengambil detail hoster berdasarkan ID
+*/
 func (r *hosterRespository) GetDetailHoster(id string) (*model.HosterModel, error) {
 	var hoster model.HosterModel
+	/*
+	  GetDetailHoster query
+	  mengambil detail hoster berdasarkan ID
+	*/
 	query := `
         SELECT 
             id,
@@ -114,12 +134,20 @@ func (r *hosterRespository) GetDetailHoster(id string) (*model.HosterModel, erro
 	return &hoster, nil
 }
 
+/*
+CreateItem
+membuat item baru dengan data yang diberikan
+*/
 func (r *hosterRespository) CreateItem(item *model.ItemModel) error {
 	photosJSON, err := json.Marshal(item.Photos)
 	if err != nil {
 		log.Printf("CreateItem: error marshaling photos: %v", err)
 		return err
 	}
+	/*
+	  CreateItem query
+	  membuat item baru dengan data yang diberikan
+	*/
 	query := `
 		INSERT INTO item (
 			id,
@@ -147,7 +175,15 @@ func (r *hosterRespository) CreateItem(item *model.ItemModel) error {
 	return nil
 }
 
+/*
+FindItemNameByID
+mencari item berdasarkan ID
+*/
 func (r *hosterRespository) FindItemNameByID(id string) (*model.ItemModel, error) {
+	/*
+	  FindItemNameByID query
+	  mencari item berdasarkan ID
+	*/
 	query := `
 		SELECT
 			id,
@@ -190,7 +226,15 @@ func (r *hosterRespository) FindItemNameByID(id string) (*model.ItemModel, error
 	return &item, nil
 }
 
+/*
+FindItemNameByUserID
+mencari item berdasarkan nama dan user ID
+*/
 func (r *hosterRespository) FindItemNameByUserID(name string, userId string) (*model.ItemModel, error) {
+	/*
+	  FindItemNameByUserID query
+	  mencari item berdasarkan nama dan user ID
+	*/
 	query := `
 		SELECT
 			id,
@@ -233,7 +277,15 @@ func (r *hosterRespository) FindItemNameByUserID(name string, userId string) (*m
 	return &item, nil
 }
 
+/*
+GetAllItems
+mengambil semua item
+*/
 func (r *hosterRespository) GetAllItems() ([]*model.ItemModel, error) {
+	/*
+	  GetAllItems query
+	  mengambil semua item
+	*/
 	query := `
 		SELECT
 			id,
@@ -273,7 +325,15 @@ func (r *hosterRespository) GetAllItems() ([]*model.ItemModel, error) {
 	return items, nil
 }
 
+/*
+UpdateItem
+memperbarui item berdasarkan ID
+*/
 func (r *hosterRespository) UpdateItem(item *model.ItemModel) error {
+	/*
+	  UpdateItem query
+	  memperbarui item berdasarkan ID
+	*/
 	query := `
 		UPDATE item
 		SET
@@ -302,7 +362,15 @@ func (r *hosterRespository) UpdateItem(item *model.ItemModel) error {
 	return nil
 }
 
+/*
+DeleteItem
+menghapus item berdasarkan ID
+*/
 func (r *hosterRespository) DeleteItem(id string) error {
+	/*
+	  DeleteItem query
+	  menghapus item berdasarkan ID
+	*/
 	query := `DELETE FROM item WHERE id = $1`
 	_, err := r.db.Exec(query, id)
 	if err != nil {
@@ -312,12 +380,20 @@ func (r *hosterRespository) DeleteItem(id string) error {
 	return nil
 }
 
+/*
+CreateTermsAndConditions
+membuat syarat dan ketentuan baru
+*/
 func (r *hosterRespository) CreateTermsAndConditions(tac *model.TermsAndConditionsModel) error {
 	descriptionJSON, err := json.Marshal(tac.Description)
 	if err != nil {
 		log.Printf("CreateTermsAndConditions: error marshaling description: %v", err)
 		return err
 	}
+	/*
+	  CreateTermsAndConditions query
+	  membuat syarat dan ketentuan baru
+	*/
 	query := `
 		INSERT INTO tnc (
 			id,
@@ -335,7 +411,15 @@ func (r *hosterRespository) CreateTermsAndConditions(tac *model.TermsAndConditio
 	return nil
 }
 
+/*
+FindTermsAndConditionsByID
+mencari syarat dan ketentuan berdasarkan ID
+*/
 func (r *hosterRespository) FindTermsAndConditionsByID(id string) (*model.TermsAndConditionsModel, error) {
+	/*
+	  FindTermsAndConditionsByID query
+	  mencari syarat dan ketentuan berdasarkan ID
+	*/
 	query := `
 		SELECT
 			id,
@@ -368,12 +452,20 @@ func (r *hosterRespository) FindTermsAndConditionsByID(id string) (*model.TermsA
 	return &tac, nil
 }
 
+/*
+FindTermsAndConditionsByUserIDAndDescription
+mencari syarat dan ketentuan berdasarkan user ID dan deskripsi
+*/
 func (r *hosterRespository) FindTermsAndConditionsByUserIDAndDescription(userID string, description []string) (*model.TermsAndConditionsModel, error) {
 	descriptionJSON, err := json.Marshal(description)
 	if err != nil {
 		log.Printf("FindTermsAndConditionsByUserIDAndDescription: error marshaling description: %v", err)
 		return nil, err
 	}
+	/*
+	  FindTermsAndConditionsByUserIDAndDescription query
+	  mencari syarat dan ketentuan berdasarkan user ID dan deskripsi
+	*/
 	query := `
         SELECT
             id,
@@ -403,7 +495,15 @@ func (r *hosterRespository) FindTermsAndConditionsByUserIDAndDescription(userID 
 	return &tac, nil
 }
 
+/*
+GetAllTermsAndConditions
+mengambil semua syarat dan ketentuan
+*/
 func (r *hosterRespository) GetAllTermsAndConditions() ([]*model.TermsAndConditionsModel, error) {
+	/*
+	  GetAllTermsAndConditions query
+	  mengambil semua syarat dan ketentuan
+	*/
 	query := `
 		SELECT
 			id,
@@ -435,12 +535,20 @@ func (r *hosterRespository) GetAllTermsAndConditions() ([]*model.TermsAndConditi
 	return terms, nil
 }
 
+/*
+UpdateTermsAndConditions
+memperbarui syarat dan ketentuan berdasarkan ID
+*/
 func (r *hosterRespository) UpdateTermsAndConditions(tac *model.TermsAndConditionsModel) error {
 	descriptionJSON, err := json.Marshal(tac.Description)
 	if err != nil {
 		log.Printf("UpdateTerm: error marshaling description: %v", err)
 		return err
 	}
+	/*
+	  UpdateTermsAndConditions query
+	  memperbarui syarat dan ketentuan berdasarkan ID
+	*/
 	query := `
 		UPDATE tnc
 		SET
@@ -456,7 +564,15 @@ func (r *hosterRespository) UpdateTermsAndConditions(tac *model.TermsAndConditio
 	return nil
 }
 
+/*
+DeleteTermsAndConditions
+menghapus syarat dan ketentuan berdasarkan ID
+*/
 func (r *hosterRespository) DeleteTermsAndConditions(id string) error {
+	/*
+	  DeleteTermsAndConditions query
+	  menghapus syarat dan ketentuan berdasarkan ID
+	*/
 	query := `DELETE FROM tnc WHERE id = $1`
 	_, err := r.db.Exec(query, id)
 	if err != nil {
@@ -466,8 +582,16 @@ func (r *hosterRespository) DeleteTermsAndConditions(id string) error {
 	return nil
 }
 
+/*
+GetIdentityCustomer
+mengambil identitas customer berdasarkan user ID
+*/
 func (r *hosterRespository) GetIdentityCustomer(userID string) (*model.IdentityModel, error) {
 	var identity model.IdentityModel
+	/*
+	  GetIdentityCustomer query
+	  mengambil identitas customer berdasarkan user ID
+	*/
 	query := `
         SELECT
             id,
@@ -496,7 +620,15 @@ func (r *hosterRespository) GetIdentityCustomer(userID string) (*model.IdentityM
 	return &identity, nil
 }
 
+/*
+UpdateIdentityStatus
+memperbarui status identitas berdasarkan ID
+*/
 func (r *hosterRespository) UpdateIdentityStatus(identityID string, status string, rejectedReason string, verified bool, verifiedAt *time.Time) error {
+	/*
+	  UpdateIdentityStatus query
+	  memperbarui status identitas berdasarkan ID
+	*/
 	query := `
         UPDATE identity
         SET
@@ -516,8 +648,16 @@ func (r *hosterRespository) UpdateIdentityStatus(identityID string, status strin
 	return nil
 }
 
+/*
+GetIdentityCustomerByID
+mengambil identitas customer berdasarkan identity ID
+*/
 func (r *hosterRespository) GetIdentityCustomerByID(identityID string) (*model.IdentityModel, error) {
 	var identity model.IdentityModel
+	/*
+	  GetIdentityCustomerByID query
+	  mengambil identitas customer berdasarkan identity ID
+	*/
 	query := `
         SELECT
             id,
@@ -545,7 +685,15 @@ func (r *hosterRespository) GetIdentityCustomerByID(identityID string) (*model.I
 	return &identity, nil
 }
 
+/*
+UpdateBookingStatusByUserID
+memperbarui status booking berdasarkan user ID
+*/
 func (r *hosterRespository) UpdateBookingStatusByUserID(userID, status string) error {
+	/*
+	  UpdateBookingStatusByUserID query
+	  memperbarui status booking berdasarkan user ID
+	*/
 	query := `UPDATE booking SET status = $1, updated_at = NOW() WHERE user_id = $2 AND status = 'waiting_ktp_verification'`
 	_, err := r.db.Exec(query, status, userID)
 	if err != nil {
@@ -556,7 +704,15 @@ func (r *hosterRespository) UpdateBookingStatusByUserID(userID, status string) e
 	return nil
 }
 
+/*
+UpdateBookingIdentityStatusByUserID
+memperbarui status identitas booking berdasarkan user ID
+*/
 func (r *hosterRespository) UpdateBookingIdentityStatusByUserID(userID, status string) error {
+	/*
+	  UpdateBookingIdentityStatusByUserID query
+	  memperbarui status identitas booking berdasarkan user ID
+	*/
 	query := `
         UPDATE booking_identity 
         SET status = $1, updated_at = NOW() 
@@ -578,8 +734,8 @@ func (r *hosterRespository) UpdateBookingIdentityStatusByUserID(userID, status s
 }
 
 /*
-HosterRepository mendefinisikan kontrak operasi database hoster.
-Diimplementasikan oleh hosterRespository.
+HosterRepository
+mendefinisikan kontrak untuk akses data hoster
 */
 type HosterRepository interface {
 	CreateHoster(hoster *model.HosterModel) error
@@ -605,8 +761,8 @@ type HosterRepository interface {
 }
 
 /*
-NewHosterRepository membuat instance HosterRepository.
-Menginisialisasi dengan koneksi database.
+NewHosterRepository
+membuat instance baru HosterRepository dengan database yang diberikan
 */
 func NewHosterRepository(db *sqlx.DB) HosterRepository {
 	return &hosterRespository{db: db}

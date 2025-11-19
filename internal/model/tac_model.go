@@ -3,8 +3,8 @@ package model
 import "time"
 
 /*
-Merepresentasikan data terms and conditions dengan field yang diperlukan.
-Digunakan untuk serialisasi JSON dan interaksi database.
+TermsAndConditionsModel
+struct untuk data terms and conditions dengan field JSON dan database
 */
 type TermsAndConditionsModel struct {
 	ID          string    `json:"id" db:"id"`

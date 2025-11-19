@@ -10,12 +10,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"lalan-be/internal/config"
+	"lalan-be/internal/message"
 	"lalan-be/internal/response"
 )
 
 /*
-Konstanta untuk kunci konteks.
-Mendefinisikan kunci user ID dan role dalam konteks.
+UserIDKey
+konstanta kunci untuk user ID dalam konteks
 */
 const (
 	UserIDKey   contextKey = "user_id"
@@ -23,14 +24,14 @@ const (
 )
 
 /*
-contextKey digunakan sebagai kunci untuk nilai konteks.
-Memastikan type safety dalam context.
+contextKey
+type untuk kunci konteks dengan type safety
 */
 type contextKey string
 
 /*
-Claims berisi data JWT standar dan role pengguna.
-Digunakan untuk parsing token JWT.
+Claims
+struct untuk data JWT dengan role pengguna
 */
 type Claims struct {
 	jwt.RegisteredClaims
@@ -38,8 +39,8 @@ type Claims struct {
 }
 
 /*
-GetUserID mengambil user ID dari konteks.
-Mengembalikan string kosong jika tidak ada.
+GetUserID
+mengambil user ID dari konteks request
 */
 func GetUserID(r *http.Request) string {
 	if val := r.Context().Value(UserIDKey); val != nil {
@@ -49,8 +50,8 @@ func GetUserID(r *http.Request) string {
 }
 
 /*
-GetUserRole mengambil user role dari konteks.
-Mengembalikan string kosong jika tidak ada.
+GetUserRole
+mengambil user role dari konteks request
 */
 func GetUserRole(r *http.Request) string {
 	if val := r.Context().Value(UserRoleKey); val != nil {
@@ -60,8 +61,8 @@ func GetUserRole(r *http.Request) string {
 }
 
 /*
-JWTMiddleware memvalidasi token JWT.
-Memperbarui konteks dengan user ID dan role jika valid.
+JWTMiddleware
+memvalidasi token JWT dan memperbarui konteks dengan user data
 */
 func JWTMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -69,16 +70,16 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			log.Printf("JWTMiddleware: Authorization header missing")
-			response.Unauthorized(w, "Authorization header missing")
+			response.Unauthorized(w, message.Unauthorized)
 			return
 		}
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		tokenString = strings.TrimSpace(tokenString)                  // Trim spasi ekstra
-		log.Printf("JWTMiddleware: Extracted token: %q", tokenString) // Log token untuk debug
+		tokenString = strings.TrimSpace(tokenString)
+		log.Printf("JWTMiddleware: Extracted token: %q", tokenString)
 		if tokenString == "" || tokenString == authHeader {
 			log.Printf("JWTMiddleware: Invalid token format")
-			response.Unauthorized(w, "Invalid token format")
+			response.Unauthorized(w, message.Unauthorized)
 			return
 		}
 
@@ -88,13 +89,12 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		})
 		if err != nil || !token.Valid {
 			log.Printf("JWTMiddleware: Token validation failed: %v", err)
-			response.Unauthorized(w, "Invalid token")
+			response.Unauthorized(w, message.Unauthorized)
 			return
 		}
 
 		log.Printf("JWTMiddleware: Token valid, userID: %s, role: %s", claims.Subject, claims.Role)
 		log.Printf("JWTMiddleware: exp=%v (unix), now=%v", claims.ExpiresAt.Unix(), time.Now().Unix())
-		// Atur konteks dengan userID dan role dari claims
 		ctx := context.WithValue(r.Context(), UserIDKey, claims.Subject)
 		ctx = context.WithValue(ctx, UserRoleKey, claims.Role)
 		r = r.WithContext(ctx)

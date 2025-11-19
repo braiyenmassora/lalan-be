@@ -10,15 +10,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"lalan-be/internal/config"
+	"lalan-be/internal/message"
 	"lalan-be/internal/middleware"
 	"lalan-be/internal/model"
-	"lalan-be/pkg/message"
 )
 
-/*
-AdminResponse berisi data token dan informasi admin.
-Digunakan untuk respons autentikasi admin.
-*/
+// AdminResponse berisi data token dan informasi admin untuk respons autentikasi
 type AdminResponse struct {
 	ID           string `json:"id"`
 	AccessToken  string `json:"access_token"`
@@ -27,18 +24,12 @@ type AdminResponse struct {
 	ExpiresIn    int    `json:"expires_in"`
 }
 
-/*
-adminService menyediakan logika bisnis untuk operasi admin.
-Menggunakan repository untuk akses data.
-*/
+// adminService menyediakan logika bisnis untuk operasi admin
 type adminService struct {
 	repo AdminRepository
 }
 
-/*
-Methods adminService menangani autentikasi dan manajemen admin serta kategori.
-Menggunakan bcrypt untuk hashing dan JWT untuk token.
-*/
+// generateTokenAdmin menghasilkan token JWT untuk admin dengan klaim tertentu
 func (s *adminService) generateTokenAdmin(userID string) (*AdminResponse, error) {
 	exp := time.Now().Add(1 * time.Hour)
 
@@ -54,7 +45,7 @@ func (s *adminService) generateTokenAdmin(userID string) (*AdminResponse, error)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	accessToken, err := token.SignedString(config.GetJWTSecret())
 	if err != nil {
-		return nil, errors.New(message.MsgInternalServerError)
+		return nil, errors.New(message.InternalError)
 	}
 
 	return &AdminResponse{
@@ -66,23 +57,25 @@ func (s *adminService) generateTokenAdmin(userID string) (*AdminResponse, error)
 	}, nil
 }
 
+// LoginAdmin melakukan autentikasi admin dan menghasilkan token jika berhasil
 func (s *adminService) LoginAdmin(email, password string) (*AdminResponse, error) {
 	admin, err := s.repo.FindByEmailAdminForLogin(email)
 	if err != nil || admin == nil {
-		return nil, errors.New(message.MsgUnauthorized)
+		return nil, errors.New(message.Unauthorized)
 	}
 
 	if bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(password)) != nil {
-		return nil, errors.New(message.MsgUnauthorized)
+		return nil, errors.New(message.Unauthorized)
 	}
 
 	return s.generateTokenAdmin(admin.ID)
 }
 
+// CreateAdmin membuat admin baru dengan hashing password dan penyimpanan data
 func (s *adminService) CreateAdmin(admin *model.AdminModel) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(admin.PasswordHash), bcrypt.DefaultCost)
 	if err != nil {
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
 	}
 	admin.PasswordHash = string(hash)
 	admin.CreatedAt = time.Now()
@@ -91,21 +84,22 @@ func (s *adminService) CreateAdmin(admin *model.AdminModel) error {
 	err = s.repo.CreateAdmin(admin)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate") {
-			return errors.New(message.MsgBadRequest)
+			return errors.New(message.BadRequest)
 		}
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
 	}
 
 	return nil
 }
 
+// CreateCategory membuat kategori baru setelah validasi nama unik
 func (s *adminService) CreateCategory(category *model.CategoryModel) error {
 	existing, err := s.repo.FindCategoryByName(category.Name)
 	if err != nil {
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
 	}
 	if existing != nil {
-		return errors.New(message.MsgBadRequest)
+		return errors.New(message.BadRequest)
 	}
 
 	category.CreatedAt = time.Now()
@@ -113,41 +107,41 @@ func (s *adminService) CreateCategory(category *model.CategoryModel) error {
 
 	err = s.repo.CreateCategory(category)
 	if err != nil {
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
 	}
 
 	return nil
 }
 
+// UpdateCategory memperbarui data kategori berdasarkan ID
 func (s *adminService) UpdateCategory(category *model.CategoryModel) error {
 	category.UpdatedAt = time.Now()
 	err := s.repo.UpdateCategory(category)
 	if err != nil {
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
 	}
 	return nil
 }
 
+// DeleteCategory menghapus kategori berdasarkan ID
 func (s *adminService) DeleteCategory(id string) error {
 	err := s.repo.DeleteCategory(id)
 	if err != nil {
-		return errors.New(message.MsgInternalServerError)
+		return errors.New(message.InternalError)
 	}
 	return nil
 }
 
+// GetAllCategory mengambil semua data kategori
 func (s *adminService) GetAllCategory() ([]*model.CategoryModel, error) {
 	categories, err := s.repo.GetAllCategory()
 	if err != nil {
-		return nil, errors.New(message.MsgInternalServerError)
+		return nil, errors.New(message.InternalError)
 	}
 	return categories, nil
 }
 
-/*
-AdminService mendefinisikan kontrak untuk logika bisnis admin.
-Wajib diimplementasikan oleh semua penyedia layanan admin.
-*/
+// AdminService mendefinisikan kontrak untuk logika bisnis admin
 type AdminService interface {
 	CreateAdmin(*model.AdminModel) error
 	LoginAdmin(email, password string) (*AdminResponse, error)
@@ -157,10 +151,7 @@ type AdminService interface {
 	GetAllCategory() ([]*model.CategoryModel, error)
 }
 
-/*
-NewAdminService membuat instance baru AdminService.
-Mengembalikan interface AdminService dengan repository yang diberikan.
-*/
+// NewAdminService membuat instance baru AdminService dengan repository yang diberikan
 func NewAdminService(repo AdminRepository) AdminService {
 	return &adminService{repo: repo}
 }
