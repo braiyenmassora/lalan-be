@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -45,7 +44,6 @@ type HosterService interface {
 	UpdateTermsAndConditions(ctx context.Context, id string, input *model.TermsAndConditionsModel) (*model.TermsAndConditionsModel, error)
 	DeleteTermsAndConditions(ctx context.Context, id string) error
 	GetIdentityCustomer(ctx context.Context, userID string) (*model.IdentityModel, error)
-	UpdateIdentityStatus(ctx context.Context, identityID string, status string, rejectedReason string) error // Tambahkan ini
 }
 
 /*
@@ -94,11 +92,11 @@ memvalidasi login hoster dan menghasilkan token
 func (s *hosterService) LoginHoster(email, password string) (*HosterResponse, error) {
 	hoster, err := s.repo.FindByEmailHosterForLogin(email)
 	if err != nil || hoster == nil {
-		return nil, errors.New(message.Unauthorized)
+		return nil, errors.New(message.LoginFailed)
 	}
 
 	if bcrypt.CompareHashAndPassword([]byte(hoster.PasswordHash), []byte(password)) != nil {
-		return nil, errors.New(message.Unauthorized)
+		return nil, errors.New(message.LoginFailed)
 	}
 
 	return s.generateTokenHoster(hoster.ID)
@@ -187,7 +185,7 @@ func (s *hosterService) CreateItem(ctx context.Context, input *model.ItemModel) 
 		return nil, errors.New(message.InternalError)
 	}
 	if existing != nil {
-		return nil, errors.New(message.BadRequest)
+		return nil, errors.New(fmt.Sprintf(message.AlreadyExists, "item"))
 	}
 
 	input.ID = uuid.New().String()
@@ -337,7 +335,7 @@ func (s *hosterService) CreateTermsAndConditions(ctx context.Context, input *mod
 		return nil, errors.New(message.InternalError)
 	}
 	if existing != nil {
-		return nil, errors.New(message.BadRequest)
+		return nil, errors.New(fmt.Sprintf(message.AlreadyExists, "terms and conditions"))
 	}
 
 	input.ID = uuid.New().String()
@@ -346,7 +344,7 @@ func (s *hosterService) CreateTermsAndConditions(ctx context.Context, input *mod
 	if err := s.repo.CreateTermsAndConditions(input); err != nil {
 		// Handle database duplicate key error
 		if strings.Contains(err.Error(), "duplicate key value violates unique constraint \"tnc_user_id_key\"") {
-			return nil, errors.New(message.BadRequest)
+			return nil, errors.New(fmt.Sprintf(message.AlreadyExists, "terms and conditions"))
 		}
 		return nil, errors.New(message.InternalError)
 	}
@@ -439,18 +437,13 @@ func (s *hosterService) DeleteTermsAndConditions(ctx context.Context, id string)
 
 /*
 GetIdentityCustomer
-mengambil identitas customer berdasarkan user ID
+mengambil identitas customer berdasarkan userID
 */
 func (s *hosterService) GetIdentityCustomer(ctx context.Context, userID string) (*model.IdentityModel, error) {
-	// Ambil ID admin/hoster dari context (untuk otorisasi)
-	adminID, ok := ctx.Value(middleware.UserIDKey).(string)
-	if !ok {
-		return nil, errors.New(message.Unauthorized)
+	if userID == "" {
+		return nil, errors.New(fmt.Sprintf(message.Required, "user ID"))
 	}
 
-	log.Printf("GetIdentityCustomer: adminID from context: %s, userID param: %s", adminID, userID) // Tambahkan log
-
-	// Panggil repository
 	identity, err := s.repo.GetIdentityCustomer(userID)
 	if err != nil {
 		return nil, errors.New(message.InternalError)
@@ -460,134 +453,6 @@ func (s *hosterService) GetIdentityCustomer(ctx context.Context, userID string) 
 	}
 
 	return identity, nil
-}
-
-/*
-UpdateIdentityStatus
-memperbarui status identitas berdasarkan identity ID
-*/
-func (s *hosterService) UpdateIdentityStatus(ctx context.Context, identityID string, status string, rejectedReason string) error {
-	// Ambil ID hoster dari context
-	hosterID, ok := ctx.Value(middleware.UserIDKey).(string)
-	if !ok {
-		log.Printf("UpdateIdentityStatus: unauthorized access")
-		return errors.New(message.Unauthorized)
-	}
-
-	log.Printf("UpdateIdentityStatus: hoster %s updating identity %s to status %s", hosterID, identityID, status)
-
-	// Validasi status
-	if status != "approved" && status != "rejected" {
-		log.Printf("UpdateIdentityStatus: invalid status %s", status)
-		return errors.New(message.InvalidStatus)
-	}
-
-	// Cek apakah identity ada
-	identity, err := s.repo.GetIdentityCustomerByID(identityID)
-	if err != nil {
-		log.Printf("UpdateIdentityStatus: error getting identity %s: %v", identityID, err)
-		return errors.New(message.InternalError)
-	}
-	if identity == nil {
-		log.Printf("UpdateIdentityStatus: identity %s not found", identityID)
-		return errors.New(fmt.Sprintf(message.NotFound, "identity"))
-	}
-
-	// Hitung verified dan verifiedAt
-	var verified bool
-	var verifiedAt *time.Time
-	if status == "approved" {
-		verified = true
-		now := time.Now()
-		verifiedAt = &now
-	} else {
-		verified = false
-		verifiedAt = nil
-	}
-
-	// Update status
-	err = s.repo.UpdateIdentityStatus(identityID, status, rejectedReason, verified, verifiedAt)
-	if err != nil {
-		log.Printf("UpdateIdentityStatus: error updating identity %s: %v", identityID, err)
-		return errors.New(message.InternalError)
-	}
-
-	// Jika approved atau rejected, update booking identity status
-	if status == "approved" || status == "rejected" {
-		log.Printf("UpdateIdentityStatus: updating booking identity for user %s to %s", identity.UserID, status)
-		err = s.repo.UpdateBookingIdentityStatusByUserID(identity.UserID, status)
-		if err != nil {
-			log.Printf("UpdateIdentityStatus: error updating booking identity status: %v", err)
-			return errors.New(message.InternalError)
-		}
-	}
-
-	log.Printf("UpdateIdentityStatus: successfully updated identity %s to status %s", identityID, status)
-	return nil
-}
-
-/*
-VerifyIdentity
-memverifikasi identitas customer dengan status dan alasan penolakan
-*/
-func (s *hosterService) VerifyIdentity(ctx context.Context, identityID string, status string, rejectionReason string) error {
-	// Ambil ID hoster dari context
-	hosterID, ok := ctx.Value(middleware.UserIDKey).(string)
-	if !ok {
-		log.Printf("VerifyIdentity: unauthorized access")
-		return errors.New(message.Unauthorized)
-	}
-
-	log.Printf("VerifyIdentity: hoster %s verifying identity %s with status %s", hosterID, identityID, status)
-
-	// Validasi status
-	if status != "approved" && status != "rejected" {
-		log.Printf("VerifyIdentity: invalid status %s", status)
-		return errors.New(message.InvalidStatus)
-	}
-
-	// Cek apakah identity ada
-	identity, err := s.repo.GetIdentityCustomerByID(identityID)
-	if err != nil {
-		log.Printf("VerifyIdentity: error getting identity %s: %v", identityID, err)
-		return errors.New(message.InternalError)
-	}
-	if identity == nil {
-		log.Printf("VerifyIdentity: identity %s not found", identityID)
-		return errors.New(fmt.Sprintf(message.NotFound, "identity"))
-	}
-
-	// Hitung verified dan verifiedAt
-	var verified bool
-	var verifiedAt *time.Time
-	if status == "approved" {
-		verified = true
-		now := time.Now()
-		verifiedAt = &now
-	} else {
-		verified = false
-		verifiedAt = nil
-	}
-
-	// Update status
-	err = s.repo.UpdateIdentityStatus(identityID, status, rejectionReason, verified, verifiedAt)
-	if err != nil {
-		log.Printf("VerifyIdentity: error updating identity %s: %v", identityID, err)
-		return errors.New(message.InternalError)
-	}
-
-	// Jika approved, update booking identity status
-	if status == "approved" {
-		log.Printf("VerifyIdentity: updating booking identity for user %s", identity.UserID)
-		err = s.repo.UpdateBookingIdentityStatusByUserID(identity.UserID, "approved")
-		if err != nil {
-			log.Printf("VerifyIdentity: error updating booking identity status: %v", err)
-			return errors.New(message.InternalError)
-		}
-	}
-
-	log.Printf("VerifyIdentity: successfully updated identity %s to status %s", identityID, status)
-	return nil
 }
 
 /*

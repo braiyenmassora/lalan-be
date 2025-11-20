@@ -51,15 +51,6 @@ type LoginRequest struct {
 }
 
 /*
-UpdateIdentityStatusRequest
-berisi data untuk memperbarui status identitas
-*/
-type UpdateIdentityStatusRequest struct {
-	Status         string `json:"status"`          // "approved" or "rejected"
-	RejectedReason string `json:"rejected_reason"` // Optional
-}
-
-/*
 CreateHoster
 membuat hoster baru dengan validasi input dan response sukses atau error
 */
@@ -456,102 +447,6 @@ func (h *HosterHandler) DeleteTermsAndConditions(w http.ResponseWriter, r *http.
 		return
 	}
 	response.OK(w, nil, fmt.Sprintf(message.Deleted, "terms and conditions"))
-}
-
-/*
-GetIdentityCustomer
-mengambil identitas customer berdasarkan userID dan response data atau error
-*/
-func (h *HosterHandler) GetIdentityCustomer(w http.ResponseWriter, r *http.Request) {
-	log.Printf("GetIdentityCustomer: received request")
-	if r.Method != http.MethodGet {
-		response.BadRequest(w, message.MethodNotAllowed)
-		return
-	}
-
-	// Ambil userID dari path param
-	vars := mux.Vars(r)
-	log.Printf("GetIdentityCustomer: vars: %+v", vars) // Tambahkan log
-	userID := strings.TrimSpace(vars["userID"])
-	log.Printf("GetIdentityCustomer: userID from path: %s", userID)
-	if userID == "" {
-		log.Printf("GetIdentityCustomer: userID required")
-		response.BadRequest(w, message.BadRequest)
-		return
-	}
-
-	// Panggil service
-	ctx := r.Context()
-	identity, err := h.service.GetIdentityCustomer(ctx, userID)
-	if err != nil {
-		log.Printf("GetIdentityCustomer: error getting identity: %v", err)
-		if err.Error() == message.Unauthorized {
-			response.Unauthorized(w, message.Unauthorized)
-		} else if err.Error() == fmt.Sprintf(message.NotFound, "identity") {
-			response.Error(w, http.StatusNotFound, fmt.Sprintf(message.NotFound, "identity"))
-		} else {
-			response.Error(w, http.StatusInternalServerError, message.InternalError)
-		}
-		return
-	}
-
-	log.Printf("GetIdentityCustomer: retrieved identity for user %s", userID)
-	response.OK(w, identity, message.Success)
-}
-
-/*
-UpdateIdentityStatus
-memperbarui status identitas berdasarkan identityID dan response sukses atau error
-*/
-func (h *HosterHandler) UpdateIdentityStatus(w http.ResponseWriter, r *http.Request) {
-	log.Printf("UpdateIdentityStatus: received request")
-	if r.Method != http.MethodPut {
-		response.BadRequest(w, message.MethodNotAllowed)
-		return
-	}
-
-	// Ambil identityID dari path param
-	vars := mux.Vars(r)
-	identityID := strings.TrimSpace(vars["identityID"])
-	if identityID == "" {
-		log.Printf("UpdateIdentityStatus: identityID required")
-		response.BadRequest(w, message.BadRequest)
-		return
-	}
-
-	var req UpdateIdentityStatusRequest
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&req); err != nil {
-		log.Printf("UpdateIdentityStatus: invalid JSON: %v", err)
-		response.BadRequest(w, message.BadRequest)
-		return
-	}
-
-	// Validasi input
-	if req.Status != "approved" && req.Status != "rejected" {
-		log.Printf("UpdateIdentityStatus: invalid status")
-		response.BadRequest(w, message.InvalidStatus)
-		return
-	}
-
-	// Panggil service
-	ctx := r.Context()
-	err := h.service.UpdateIdentityStatus(ctx, identityID, req.Status, req.RejectedReason)
-	if err != nil {
-		log.Printf("UpdateIdentityStatus: error updating identity: %v", err)
-		if err.Error() == message.Unauthorized {
-			response.Unauthorized(w, message.Unauthorized)
-		} else if err.Error() == fmt.Sprintf(message.NotFound, "identity") {
-			response.Error(w, http.StatusNotFound, fmt.Sprintf(message.NotFound, "identity"))
-		} else {
-			response.Error(w, http.StatusInternalServerError, message.InternalError)
-		}
-		return
-	}
-
-	log.Printf("UpdateIdentityStatus: identity status updated successfully")
-	response.OK(w, nil, fmt.Sprintf(message.Updated, "identity status"))
 }
 
 /*

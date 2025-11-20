@@ -18,7 +18,6 @@ type BookingModel struct {
 	DeliveryType         string    `json:"delivery_type" db:"delivery_type"`
 	Rental               int       `json:"rental" db:"rental"`
 	Deposit              int       `json:"deposit" db:"deposit"`
-	Delivery             int       `json:"delivery" db:"delivery"`
 	Discount             int       `json:"discount" db:"discount"`
 	Total                int       `json:"total" db:"total"`
 	Outstanding          int       `json:"outstanding" db:"outstanding"`
@@ -49,13 +48,13 @@ BookingCustomer
 struct untuk snapshot customer dalam booking
 */
 type BookingCustomer struct {
-	ID              string `json:"id" db:"id"`
-	BookingID       string `json:"booking_id" db:"booking_id"`
-	Name            string `json:"name" db:"name"`
-	Phone           string `json:"phone" db:"phone"`
-	Email           string `json:"email" db:"email"`
-	DeliveryAddress string `json:"delivery_address" db:"delivery_address"`
-	Notes           string `json:"notes" db:"notes"`
+	ID        string `json:"id" db:"id"`
+	BookingID string `json:"booking_id" db:"booking_id"`
+	Name      string `json:"name" db:"name"`
+	Phone     string `json:"phone" db:"phone"`
+	Email     string `json:"email" db:"email"`
+	Address   string `json:"address" db:"address"`
+	Notes     string `json:"notes" db:"notes"`
 }
 
 /*
@@ -67,7 +66,7 @@ type BookingIdentity struct {
 	BookingID       string    `json:"booking_id" db:"booking_id"`
 	Uploaded        bool      `json:"uploaded" db:"uploaded"`
 	Status          string    `json:"status" db:"status"`
-	RejectionReason *string   `json:"rejection_reason" db:"rejection_reason"`
+	Reason          *string   `json:"reason" db:"reason"`
 	ReuploadAllowed bool      `json:"reupload_allowed" db:"reupload_allowed"`
 	EstimatedTime   string    `json:"estimated_time" db:"estimated_time"`
 	StatusCheckURL  string    `json:"status_check_url" db:"status_check_url"`
@@ -103,7 +102,6 @@ struct untuk harga booking
 type BookingPrice struct {
 	Rental      int `json:"rental"`
 	Deposit     int `json:"deposit"`
-	Delivery    int `json:"delivery"`
 	Discount    int `json:"discount"`
 	Total       int `json:"total"`
 	Outstanding int `json:"outstanding"`
@@ -114,11 +112,11 @@ BookingListDTO
 struct DTO untuk daftar booking
 */
 type BookingListDTO struct {
-	Code      string    `json:"code" db:"code"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
-	ItemName  string    `json:"item_name" db:"item_name"`
-	Quantity  int       `json:"quantity" db:"quantity"`
-	KtpStatus string    `json:"ktp_status" db:"ktp_status"`
-	Total     int       `json:"total" db:"total"`
+	Code           string `json:"code" db:"code"`
+	StartDate      string `json:"start_date" db:"start_date"`
+	EndDate        string `json:"end_date" db:"end_date"`
+	Total          int    `json:"total" db:"total"`
+	IdentityStatus string `json:"identity_status" db:"identity_status"`
+	ItemSummary    string `json:"item_summary" db:"item_summary"`
+	Quantity       int    `json:"quantity" db:"quantity"`
 }

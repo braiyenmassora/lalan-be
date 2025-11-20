@@ -2,9 +2,11 @@ package customer
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log"
+	"math/big"
 	"strings"
 	"time"
 
@@ -64,11 +66,15 @@ memvalidasi login customer dan menghasilkan token
 func (s *customerService) LoginCustomer(email, password string) (*CustomerResponse, error) {
 	customer, err := s.repo.FindByEmailCustomerForLogin(email)
 	if err != nil || customer == nil {
-		return nil, errors.New(message.Unauthorized)
+		return nil, errors.New(message.LoginFailed)
+	}
+
+	if !customer.EmailVerified {
+		return nil, errors.New("Email belum diverifikasi. Silakan verifikasi email terlebih dahulu.")
 	}
 
 	if bcrypt.CompareHashAndPassword([]byte(customer.PasswordHash), []byte(password)) != nil {
-		return nil, errors.New(message.Unauthorized)
+		return nil, errors.New(message.LoginFailed)
 	}
 
 	return s.generateTokenCustomer(customer.ID)
@@ -78,24 +84,112 @@ func (s *customerService) LoginCustomer(email, password string) (*CustomerRespon
 CreateCustomer
 membuat customer baru dengan hash password
 */
-func (s *customerService) CreateCustomer(customer *model.CustomerModel) error {
-	hash, err := bcrypt.GenerateFromPassword([]byte(customer.PasswordHash), bcrypt.DefaultCost)
+func (s *customerService) CreateCustomer(customer *model.CustomerModel) (*CreateCustomerResponse, error) {
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(customer.PasswordHash), bcrypt.DefaultCost)
 	if err != nil {
-		return errors.New(message.InternalError)
+		log.Printf("CreateCustomer: error hashing password: %v", err)
+		return nil, errors.New(message.InternalError)
 	}
-	customer.PasswordHash = string(hash)
+	customer.PasswordHash = string(hashedPassword)
+
+	// Generate OTP
+	otp := s.generateOTP()
+
+	// Set email verification fields
+	customer.EmailVerified = false
+	customer.VerificationToken = otp
+	customer.VerificationExpiresAt = &time.Time{}
+	*customer.VerificationExpiresAt = time.Now().Add(5 * time.Minute)
 	customer.CreatedAt = time.Now()
 	customer.UpdatedAt = time.Now()
 
 	err = s.repo.CreateCustomer(customer)
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate") {
-			return errors.New(fmt.Sprintf(message.AlreadyExists, "customer email"))
+		if err.Error() == "email already exists" {
+			return nil, errors.New(message.EmailAlreadyExists)
+		}
+		log.Printf("CreateCustomer: error creating customer: %v", err)
+		return nil, errors.New(message.InternalError)
+	}
+
+	// TODO: Send OTP email (integrate with email service)
+
+	log.Printf("CreateCustomer: customer created with email %s", customer.Email)
+	return &CreateCustomerResponse{
+		Customer: customer,
+		OTP:      otp,
+	}, nil
+}
+
+/*
+generateOTP
+menghasilkan OTP 6 digit
+*/
+func (s *customerService) generateOTP() string {
+	const otpChars = "0123456789"
+	otp := ""
+	for i := 0; i < 6; i++ {
+		num, _ := rand.Int(rand.Reader, big.NewInt(10))
+		otp += string(otpChars[num.Int64()])
+	}
+	return otp
+}
+
+/*
+SendOTP
+memverifikasi email customer dengan OTP
+*/
+func (s *customerService) SendOTP(email string, otp string) error {
+	err := s.repo.SendOTP(email, otp)
+	if err != nil {
+		if err.Error() == "invalid or expired OTP" {
+			return errors.New(message.OTPInvalid)
 		}
 		return errors.New(message.InternalError)
 	}
-
+	log.Printf("SendOTP: email %s verified successfully", email)
 	return nil
+}
+
+/*
+ResendOTP
+mengirim ulang OTP dengan token baru dan waktu kadaluarsa
+*/
+func (s *customerService) ResendOTP(email string) (*ResendOTPResponse, error) {
+	// Check if customer exists and if email is already verified
+	customer, err := s.repo.FindByEmailCustomerForLogin(email)
+	if err != nil {
+		return nil, errors.New(message.InternalError)
+	}
+	if customer == nil {
+		return nil, errors.New(fmt.Sprintf(message.NotFound, "customer"))
+	}
+	if customer.EmailVerified {
+		return nil, errors.New(message.OTPAlreadyVerified)
+	}
+
+	// Generate new OTP
+	newOTP := s.generateOTP()
+
+	// Set expiration time (e.g., 5 minutes from now)
+	expireTime := time.Now().Add(5 * time.Minute)
+
+	// Update customer with new OTP via repository
+	err = s.repo.ResendOTP(email, newOTP, expireTime)
+	if err != nil {
+		if err.Error() == "customer not found" {
+			return nil, errors.New(fmt.Sprintf(message.NotFound, "customer"))
+		}
+		return nil, errors.New(message.InternalError)
+	}
+
+	// TODO: Send new OTP email (integrate with email service)
+
+	log.Printf("ResendOTP: new OTP sent for email %s", email)
+	return &ResendOTPResponse{
+		OTP: newOTP,
+	}, nil
 }
 
 /*
@@ -200,7 +294,7 @@ func (s *customerService) UploadIdentity(ctx context.Context, ktpURL string) err
 		existingIdentity.KTPURL = ktpURL
 		existingIdentity.Verified = false
 		existingIdentity.Status = "pending"
-		existingIdentity.RejectedReason = ""
+		existingIdentity.Reason = ""
 		existingIdentity.VerifiedAt = nil
 		existingIdentity.UpdatedAt = time.Now()
 		err = s.repo.UpdateIdentity(existingIdentity)
@@ -211,15 +305,15 @@ func (s *customerService) UploadIdentity(ctx context.Context, ktpURL string) err
 	} else {
 		identityID := uuid.New().String()
 		identity := &model.IdentityModel{
-			ID:             identityID,
-			UserID:         id,
-			KTPURL:         ktpURL,
-			Verified:       false,
-			Status:         "pending",
-			RejectedReason: "",
-			VerifiedAt:     nil,
-			CreatedAt:      time.Now(),
-			UpdatedAt:      time.Now(),
+			ID:         identityID,
+			UserID:     id,
+			KTPURL:     ktpURL,
+			Verified:   false,
+			Status:     "pending",
+			Reason:     "",
+			VerifiedAt: nil,
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
 		}
 		err = s.repo.CreateIdentity(identity)
 		if err != nil {
@@ -255,7 +349,7 @@ func (s *customerService) UpdateIdentity(ctx context.Context, ktpURL string) err
 	existingIdentity.KTPURL = ktpURL
 	existingIdentity.Verified = false
 	existingIdentity.Status = "pending"
-	existingIdentity.RejectedReason = ""
+	existingIdentity.Reason = ""
 	existingIdentity.VerifiedAt = nil
 	existingIdentity.UpdatedAt = time.Now()
 
@@ -323,7 +417,18 @@ func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRe
 		return nil, errors.New(message.InternalError)
 	}
 	if identity == nil {
-		return nil, errors.New(fmt.Sprintf(message.NotFound, "identity"))
+		return nil, errors.New("Anda belum mengunggah KTP. Silakan unggah KTP terlebih dahulu untuk melanjutkan pemesanan.")
+	}
+
+	// Validasi status identitas
+	if identity.Status == "pending" {
+		return nil, errors.New(message.IdentityPendingReview)
+	}
+	if identity.Status == "rejected" {
+		return nil, errors.New(fmt.Sprintf(message.IdentityRejected, identity.Reason))
+	}
+	if identity.Status != "approved" {
+		return nil, errors.New(message.Unauthorized)
 	}
 
 	start, _ := time.Parse("2006-01-02", req.StartDate)
@@ -335,7 +440,7 @@ func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRe
 		rental += item.SubtotalRental
 		deposit += item.SubtotalDeposit
 	}
-	total := rental + deposit + req.Delivery - req.Discount
+	total := rental + deposit - req.Discount
 	outstanding := total
 
 	bookingID := uuid.New().String()
@@ -354,7 +459,6 @@ func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRe
 		DeliveryType:         req.DeliveryType,
 		Rental:               rental,
 		Deposit:              deposit,
-		Delivery:             req.Delivery,
 		Discount:             req.Discount,
 		Total:                total,
 		Outstanding:          outstanding,
@@ -390,13 +494,13 @@ func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRe
 	}
 
 	customer := model.BookingCustomer{
-		ID:              uuid.New().String(),
-		BookingID:       bookingID,
-		Name:            req.Customer.Name,
-		Phone:           req.Customer.Phone,
-		Email:           req.Customer.Email,
-		DeliveryAddress: req.Customer.DeliveryAddress,
-		Notes:           req.Customer.Notes,
+		ID:        uuid.New().String(),
+		BookingID: bookingID,
+		Name:      req.Customer.Name,
+		Phone:     req.Customer.Phone,
+		Email:     req.Customer.Email,
+		Address:   req.Customer.Address,
+		Notes:     req.Customer.Notes,
 	}
 
 	bookingIdentity := model.BookingIdentity{
@@ -404,10 +508,10 @@ func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRe
 		BookingID:       bookingID,
 		Uploaded:        true,
 		Status:          identity.Status,
-		RejectionReason: &identity.RejectedReason,
+		Reason:          &identity.Reason,
 		ReuploadAllowed: identity.Status == "rejected",
 		EstimatedTime:   "Maksimal 30 menit",
-		StatusCheckURL:  "/api/v1/customer/identity-status",
+		StatusCheckURL:  "/api/v1/admin/identity/" + id,
 		CreatedAt:       time.Now(),
 		UpdatedAt:       time.Now(),
 	}
@@ -489,14 +593,12 @@ type CustomerResponse struct {
 }
 
 /*
-CreateBookingResponse
-format response untuk membuat booking
+CreateCustomerResponse
+format response setelah pembuatan customer
 */
-type CreateBookingResponse struct {
-	Code    int                    `json:"code"`
-	Data    model.BookingDetailDTO `json:"data"`
-	Message string                 `json:"message"`
-	Success bool                   `json:"success"`
+type CreateCustomerResponse struct {
+	Customer *model.CustomerModel `json:"customer"`
+	OTP      string               `json:"otp"`
 }
 
 /*
@@ -505,7 +607,7 @@ interface untuk operasi service customer
 */
 type CustomerService interface {
 	LoginCustomer(email, password string) (*CustomerResponse, error)
-	CreateCustomer(customer *model.CustomerModel) error
+	CreateCustomer(customer *model.CustomerModel) (*CreateCustomerResponse, error)
 	GetDetailCustomer(ctx context.Context) (*model.CustomerModel, error)
 	UpdateCustomer(ctx context.Context, updateData *model.CustomerModel) error
 	DeleteCustomer(ctx context.Context) error
@@ -517,6 +619,8 @@ type CustomerService interface {
 	GetBookingsByUserID(ctx context.Context) ([]model.BookingListDTO, error)
 	GetListBookings(ctx context.Context) ([]model.BookingListDTO, error)
 	GetDetailBooking(ctx context.Context, bookingID string) (*model.BookingDetailDTO, error)
+	SendOTP(email string, otp string) error
+	ResendOTP(email string) (*ResendOTPResponse, error)
 }
 
 /*
@@ -552,11 +656,19 @@ CreateBookingCustomer
 berisi data customer dalam booking
 */
 type CreateBookingCustomer struct {
-	Name            string `json:"name"`
-	Phone           string `json:"phone"`
-	Email           string `json:"email"`
-	DeliveryAddress string `json:"delivery_address"`
-	Notes           string `json:"notes"`
+	Name    string `json:"name"`
+	Phone   string `json:"phone"`
+	Email   string `json:"email"`
+	Address string `json:"delivery_address"`
+	Notes   string `json:"notes"`
+}
+
+/*
+ResendOTPResponse
+format response untuk pengiriman ulang OTP
+*/
+type ResendOTPResponse struct {
+	OTP string `json:"otp"`
 }
 
 /*
