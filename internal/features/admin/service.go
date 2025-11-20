@@ -1,7 +1,10 @@
 package admin
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -61,11 +64,11 @@ func (s *adminService) generateTokenAdmin(userID string) (*AdminResponse, error)
 func (s *adminService) LoginAdmin(email, password string) (*AdminResponse, error) {
 	admin, err := s.repo.FindByEmailAdminForLogin(email)
 	if err != nil || admin == nil {
-		return nil, errors.New(message.Unauthorized)
+		return nil, errors.New(message.LoginFailed)
 	}
 
 	if bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(password)) != nil {
-		return nil, errors.New(message.Unauthorized)
+		return nil, errors.New(message.LoginFailed)
 	}
 
 	return s.generateTokenAdmin(admin.ID)
@@ -84,7 +87,7 @@ func (s *adminService) CreateAdmin(admin *model.AdminModel) error {
 	err = s.repo.CreateAdmin(admin)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate") {
-			return errors.New(message.BadRequest)
+			return errors.New(fmt.Sprintf(message.AlreadyExists, "admin"))
 		}
 		return errors.New(message.InternalError)
 	}
@@ -99,7 +102,7 @@ func (s *adminService) CreateCategory(category *model.CategoryModel) error {
 		return errors.New(message.InternalError)
 	}
 	if existing != nil {
-		return errors.New(message.BadRequest)
+		return errors.New(fmt.Sprintf(message.AlreadyExists, "category"))
 	}
 
 	category.CreatedAt = time.Now()
@@ -141,6 +144,77 @@ func (s *adminService) GetAllCategory() ([]*model.CategoryModel, error) {
 	return categories, nil
 }
 
+/*
+UpdateIdentityStatus
+memperbarui status identitas berdasarkan user ID
+*/
+func (s *adminService) UpdateIdentityStatus(ctx context.Context, userID string, status string, rejectedReason string) error {
+	// Ambil ID admin dari context
+	adminID, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		log.Printf("UpdateIdentityStatus: unauthorized access")
+		return errors.New(message.Unauthorized)
+	}
+
+	log.Printf("UpdateIdentityStatus: admin %s updating identity for user %s to status %s", adminID, userID, status)
+
+	// Validasi status
+	if status != "approved" && status != "rejected" {
+		log.Printf("UpdateIdentityStatus: invalid status %s", status)
+		return errors.New(message.InvalidStatus)
+	}
+
+	// Cek apakah identity ada berdasarkan user ID
+	identity, err := s.repo.GetIdentityByCustomerID(userID)
+	if err != nil {
+		log.Printf("UpdateIdentityStatus: error getting identity for user %s: %v", userID, err)
+		return errors.New(message.InternalError)
+	}
+	if identity == nil {
+		log.Printf("UpdateIdentityStatus: identity not found for user %s", userID)
+		return errors.New(fmt.Sprintf(message.NotFound, "identity"))
+	}
+
+	// Hitung verified dan verifiedAt
+	var verified bool
+	var verifiedAt *time.Time
+	if status == "approved" {
+		verified = true
+		now := time.Now()
+		verifiedAt = &now
+	} else {
+		verified = false
+		verifiedAt = nil
+	}
+
+	// Update status menggunakan identity ID
+	err = s.repo.UpdateIdentityStatus(identity.ID, status, rejectedReason, verified, verifiedAt)
+	if err != nil {
+		log.Printf("UpdateIdentityStatus: error updating identity %s: %v", identity.ID, err)
+		return errors.New(message.InternalError)
+	}
+
+	log.Printf("UpdateIdentityStatus: successfully updated identity for user %s to status %s", userID, status)
+	return nil
+}
+
+/*
+GetIdentityByCustomerID
+mengambil data identitas berdasarkan user ID
+*/
+func (s *adminService) GetIdentityByCustomerID(userID string) (*model.IdentityModel, error) {
+	identity, err := s.repo.GetIdentityByCustomerID(userID)
+	if err != nil {
+		log.Printf("GetIdentityByCustomerID: error getting identity for user %s: %v", userID, err)
+		return nil, errors.New(message.InternalError)
+	}
+	if identity == nil {
+		log.Printf("GetIdentityByCustomerID: identity not found for user %s", userID)
+		return nil, errors.New(fmt.Sprintf(message.NotFound, "identity"))
+	}
+	return identity, nil
+}
+
 // AdminService mendefinisikan kontrak untuk logika bisnis admin
 type AdminService interface {
 	CreateAdmin(*model.AdminModel) error
@@ -149,6 +223,8 @@ type AdminService interface {
 	UpdateCategory(*model.CategoryModel) error
 	DeleteCategory(id string) error
 	GetAllCategory() ([]*model.CategoryModel, error)
+	UpdateIdentityStatus(context.Context, string, string, string) error
+	GetIdentityByCustomerID(string) (*model.IdentityModel, error)
 }
 
 // NewAdminService membuat instance baru AdminService dengan repository yang diberikan

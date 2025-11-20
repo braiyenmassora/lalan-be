@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/gorilla/mux"
+
 	"lalan-be/internal/message"
 	"lalan-be/internal/model"
 	"lalan-be/internal/response"
@@ -309,6 +311,109 @@ func (h *AdminHandler) GetAllCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
+UpdateIdentityStatus
+memperbarui status identitas berdasarkan user ID untuk approval admin
+*/
+func (h *AdminHandler) UpdateIdentityStatus(w http.ResponseWriter, r *http.Request) {
+	log.Printf("UpdateIdentityStatus: received request")
+	if r.Method != http.MethodPut {
+		response.Error(w, http.StatusMethodNotAllowed, message.MethodNotAllowed)
+		return
+	}
+
+	vars := mux.Vars(r)
+	userID := vars["user_id"]
+	// Validasi user ID
+	if strings.TrimSpace(userID) == "" {
+		log.Printf("UpdateIdentityStatus: user_id required")
+		response.BadRequest(w, fmt.Sprintf(message.Required, "user_id"))
+		return
+	}
+
+	var req UpdateIdentityRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	// Decode JSON
+	if err := decoder.Decode(&req); err != nil {
+		log.Printf("UpdateIdentityStatus: invalid JSON: %v", err)
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+
+	// Validasi status
+	if strings.TrimSpace(req.Status) == "" {
+		log.Printf("UpdateIdentityStatus: status required")
+		response.BadRequest(w, fmt.Sprintf(message.Required, "status"))
+		return
+	}
+
+	if req.Status != "approved" && req.Status != "rejected" {
+		log.Printf("UpdateIdentityStatus: invalid status %s", req.Status)
+		response.BadRequest(w, message.InvalidStatus)
+		return
+	}
+
+	err := h.service.UpdateIdentityStatus(r.Context(), userID, req.Status, req.Reason)
+	if err != nil {
+		log.Printf("UpdateIdentityStatus: error: %v", err)
+		if err.Error() == message.Unauthorized {
+			response.Unauthorized(w, message.Unauthorized)
+			return
+		}
+		if err.Error() == message.InvalidStatus {
+			response.BadRequest(w, message.InvalidStatus)
+			return
+		}
+		if strings.Contains(err.Error(), "not found") {
+			response.NotFound(w, fmt.Sprintf(message.NotFound, "identity"))
+			return
+		}
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
+		return
+	}
+
+	if req.Status == "approved" {
+		response.OK(w, nil, message.IdentityApproved)
+	} else {
+		response.OK(w, nil, fmt.Sprintf(message.IdentityRejected, req.Reason))
+	}
+}
+
+/*
+GetIdentityByCustomerID
+mengambil data identitas berdasarkan user ID
+*/
+func (h *AdminHandler) GetIdentityByCustomerID(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GetIdentityByCustomerID: received request")
+	if r.Method != http.MethodGet {
+		response.Error(w, http.StatusMethodNotAllowed, message.MethodNotAllowed)
+		return
+	}
+
+	vars := mux.Vars(r)
+	userID := vars["user_id"]
+	// Validasi user ID
+	if strings.TrimSpace(userID) == "" {
+		log.Printf("GetIdentityByCustomerID: user_id required")
+		response.BadRequest(w, fmt.Sprintf(message.Required, "user_id"))
+		return
+	}
+
+	identity, err := h.service.GetIdentityByCustomerID(userID)
+	if err != nil {
+		log.Printf("GetIdentityByCustomerID: error: %v", err)
+		if strings.Contains(err.Error(), "not found") {
+			response.NotFound(w, fmt.Sprintf(message.NotFound, "identity"))
+			return
+		}
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
+		return
+	}
+
+	response.OK(w, identity, message.Success)
+}
+
+/*
 type AdminRequest struct
 struct yang berisi data untuk membuat admin baru
 */
@@ -334,6 +439,15 @@ struct yang berisi data untuk operasi kategori
 type CategoryRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+}
+
+/*
+type UpdateIdentityRequest struct
+struct yang berisi data untuk update status identitas
+*/
+type UpdateIdentityRequest struct {
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
 }
 
 /*

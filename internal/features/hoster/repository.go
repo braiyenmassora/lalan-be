@@ -649,43 +649,6 @@ func (r *hosterRespository) UpdateIdentityStatus(identityID string, status strin
 }
 
 /*
-GetIdentityCustomerByID
-mengambil identitas customer berdasarkan identity ID
-*/
-func (r *hosterRespository) GetIdentityCustomerByID(identityID string) (*model.IdentityModel, error) {
-	var identity model.IdentityModel
-	/*
-	  GetIdentityCustomerByID query
-	  mengambil identitas customer berdasarkan identity ID
-	*/
-	query := `
-        SELECT
-            id,
-            user_id,
-            ktp_url,
-            verified,
-            status,
-            rejected_reason,
-            verified_at,
-            created_at,
-            updated_at
-        FROM identity
-        WHERE id = $1
-    `
-	err := r.db.Get(&identity, query, identityID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			log.Printf("GetIdentityCustomerByID: no identity found for ID %s", identityID)
-			return nil, nil
-		}
-		log.Printf("GetIdentityCustomerByID: error for ID %s: %v", identityID, err)
-		return nil, err
-	}
-	log.Printf("GetIdentityCustomerByID: found identity for ID %s", identityID)
-	return &identity, nil
-}
-
-/*
 UpdateBookingStatusByUserID
 memperbarui status booking berdasarkan user ID
 */
@@ -755,7 +718,6 @@ type HosterRepository interface {
 	FindTermsAndConditionsByUserIDAndDescription(userID string, description []string) (*model.TermsAndConditionsModel, error)
 	GetIdentityCustomer(userID string) (*model.IdentityModel, error)
 	UpdateIdentityStatus(identityID string, status string, rejectedReason string, verified bool, verifiedAt *time.Time) error
-	GetIdentityCustomerByID(identityID string) (*model.IdentityModel, error) // Tambahkan ini
 	UpdateBookingStatusByUserID(userID, status string) error
 	UpdateBookingIdentityStatusByUserID(userID, status string) error
 }

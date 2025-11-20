@@ -3,6 +3,7 @@ package admin
 import (
 	"database/sql"
 	"log"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 
@@ -221,6 +222,162 @@ func (r *adminRepository) GetAllCategory() ([]*model.CategoryModel, error) {
 }
 
 /*
+UpdateIdentity
+memperbarui data identitas berdasarkan ID untuk approval admin
+*/
+func (r *adminRepository) UpdateIdentity(identity *model.IdentityModel) error {
+	/*
+	  UpdateIdentity query
+	  memperbarui data identitas berdasarkan ID untuk approval admin
+	*/
+	query := `
+		UPDATE identity
+		SET
+			ktp_url = $1,
+			verified = $2,
+			status = $3,
+			reason = $4,
+			verified_at = $5,
+			updated_at = NOW()
+		WHERE id = $6
+	`
+	_, err := r.db.Exec(query, identity.KTPURL, identity.Verified, identity.Status, identity.Reason, identity.VerifiedAt, identity.ID)
+	if err != nil {
+		log.Printf("UpdateIdentity: error updating identity: %v", err)
+		return err
+	}
+	log.Printf("UpdateIdentity: updated identity %s", identity.ID)
+	return nil
+}
+
+/*
+GetIdentityCustomerByID
+mengambil data identitas berdasarkan ID
+*/
+func (r *adminRepository) GetIdentityCustomerByID(identityID string) (*model.IdentityModel, error) {
+	var identity model.IdentityModel
+	/*
+	  GetIdentityCustomerByID query
+	  mengambil data identitas berdasarkan ID
+	*/
+	query := `
+		SELECT
+			id,
+			user_id,
+			ktp_url,
+			verified,
+			status,
+			reason,
+			verified_at,
+			created_at,
+			updated_at
+		FROM identity
+		WHERE id = $1
+	`
+	err := r.db.Get(&identity, query, identityID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("GetIdentityCustomerByID: no identity found for ID %s", identityID)
+			return nil, nil
+		}
+		log.Printf("GetIdentityCustomerByID: error querying ID %s: %v", identityID, err)
+		return nil, err
+	}
+	log.Printf("GetIdentityCustomerByID: found identity for ID %s", identityID)
+	return &identity, nil
+}
+
+/*
+UpdateIdentityStatus
+memperbarui status identitas berdasarkan ID
+*/
+func (r *adminRepository) UpdateIdentityStatus(identityID string, status string, rejectedReason string, verified bool, verifiedAt *time.Time) error {
+	/*
+	  UpdateIdentityStatus query
+	  memperbarui status identitas berdasarkan ID
+	*/
+	query := `
+		UPDATE identity
+		SET
+			status = $1,
+			reason = $2,
+			verified = $3,
+			verified_at = $4,
+			updated_at = NOW()
+		WHERE id = $5
+	`
+	_, err := r.db.Exec(query, status, rejectedReason, verified, verifiedAt, identityID)
+	if err != nil {
+		log.Printf("UpdateIdentityStatus: error updating identity %s: %v", identityID, err)
+		return err
+	}
+	log.Printf("UpdateIdentityStatus: updated identity %s to status %s", identityID, status)
+	return nil
+}
+
+/*
+UpdateBookingIdentityStatusByUserID
+memperbarui status identitas di booking berdasarkan user ID
+*/
+func (r *adminRepository) UpdateBookingIdentityStatusByUserID(userID string, status string) error {
+	/*
+	  UpdateBookingIdentityStatusByUserID query
+	  memperbarui status identitas di booking berdasarkan user ID
+	*/
+	query := `
+		UPDATE booking
+		SET
+			identity_status = $1,
+			updated_at = NOW()
+		WHERE user_id = $2
+	`
+	_, err := r.db.Exec(query, status, userID)
+	if err != nil {
+		log.Printf("UpdateBookingIdentityStatusByUserID: error updating booking for user %s: %v", userID, err)
+		return err
+	}
+	log.Printf("UpdateBookingIdentityStatusByUserID: updated booking identity status for user %s to %s", userID, status)
+	return nil
+}
+
+/*
+GetIdentityByCustomerID
+mengambil data identitas berdasarkan user ID
+*/
+func (r *adminRepository) GetIdentityByCustomerID(userID string) (*model.IdentityModel, error) {
+	var identity model.IdentityModel
+	/*
+	  GetIdentityByCustomerID query
+	  mengambil data identitas berdasarkan user ID
+	*/
+	query := `
+		SELECT
+			id,
+			user_id,
+			ktp_url,
+			verified,
+			status,
+			reason,
+			verified_at,
+			created_at,
+			updated_at
+		FROM identity
+		WHERE user_id = $1
+	`
+	err := r.db.Get(&identity, query, userID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("GetIdentityByCustomerID: no identity found for user ID %s", userID)
+			return nil, nil
+		}
+		log.Printf("GetIdentityByCustomerID: error querying user ID %s: %v", userID, err)
+		return nil, err
+	}
+	log.Printf("GetIdentityByCustomerID: found identity for user ID %s", userID)
+	return &identity, nil
+}
+
+/*
 AdminRepository
 mendefinisikan kontrak untuk akses data admin dan kategori
 */
@@ -233,6 +390,11 @@ type AdminRepository interface {
 	FindCategoryByName(name string) (*model.CategoryModel, error)
 	FindCategoryByNameExceptID(name string, id string) (*model.CategoryModel, error)
 	GetAllCategory() ([]*model.CategoryModel, error)
+	UpdateIdentity(identity *model.IdentityModel) error
+	GetIdentityCustomerByID(identityID string) (*model.IdentityModel, error)
+	UpdateIdentityStatus(identityID string, status string, rejectedReason string, verified bool, verifiedAt *time.Time) error
+	UpdateBookingIdentityStatusByUserID(userID string, status string) error
+	GetIdentityByCustomerID(userID string) (*model.IdentityModel, error)
 }
 
 /*

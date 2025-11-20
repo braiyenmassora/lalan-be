@@ -58,6 +58,32 @@ type UpdateCustomerRequest struct {
 }
 
 /*
+VerifyEmailRequest
+berisi data untuk verifikasi email
+*/
+type VerifyEmailRequest struct {
+	Email string `json:"email"`
+	OTP   string `json:"otp"`
+}
+
+/*
+SendOTPRequest
+berisi data untuk verifikasi email dengan OTP
+*/
+type SendOTPRequest struct {
+	Email string `json:"email"`
+	OTP   string `json:"otp"`
+}
+
+/*
+ResendOTPRequest
+berisi data untuk mengirim ulang OTP
+*/
+type ResendOTPRequest struct {
+	Email string `json:"email"`
+}
+
+/*
 CreateCustomer
 membuat customer baru dan mengembalikan data customer
 */
@@ -98,13 +124,13 @@ func (h *CustomerHandler) CreateCustomer(w http.ResponseWriter, r *http.Request)
 		Address:      req.Address,
 		ProfilePhoto: req.ProfilePhoto,
 	}
-	err := h.service.CreateCustomer(input)
+	resp, err := h.service.CreateCustomer(input)
 	if err != nil {
 		log.Printf("CreateCustomer: error creating customer: %v", err)
 		response.BadRequest(w, err.Error())
 		return
 	}
-	response.OK(w, input, fmt.Sprintf(message.Created, "customer"))
+	response.OK(w, resp, fmt.Sprintf(message.OTPSent, req.Email))
 }
 
 /*
@@ -139,6 +165,10 @@ func (h *CustomerHandler) LoginCustomer(w http.ResponseWriter, r *http.Request) 
 	resp, err := h.service.LoginCustomer(req.Email, req.Password)
 	if err != nil {
 		log.Printf("LoginCustomer: login failed: %v", err)
+		if err.Error() == "Email belum diverifikasi. Silakan verifikasi email terlebih dahulu." {
+			response.BadRequest(w, err.Error())
+			return
+		}
 		response.Error(w, http.StatusUnauthorized, message.Unauthorized)
 		return
 	}
@@ -306,7 +336,7 @@ func (h *CustomerHandler) UploadIdentity(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	log.Printf("UploadIdentity: identity uploaded successfully")
-	response.OK(w, nil, fmt.Sprintf(message.Created, "identity"))
+	response.OK(w, nil, message.IdentitySubmitted)
 }
 
 /*
@@ -384,7 +414,7 @@ func (h *CustomerHandler) GetIdentityStatus(w http.ResponseWriter, r *http.Reque
 
 /*
 CreateBooking
-membuat booking baru untuk customer
+membuat booking baru dengan validasi input dan response sukses atau error
 */
 func (h *CustomerHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	log.Printf("CreateBooking: received request")
@@ -400,33 +430,21 @@ func (h *CustomerHandler) CreateBooking(w http.ResponseWriter, r *http.Request) 
 		response.BadRequest(w, message.BadRequest)
 		return
 	}
-	if req.StartDate == "" || req.EndDate == "" || len(req.Items) == 0 {
-		log.Printf("CreateBooking: invalid input")
-		response.BadRequest(w, message.BadRequest)
-		return
-	}
 	ctx := r.Context()
-	dto, err := h.service.CreateBooking(ctx, req)
+	detail, err := h.service.CreateBooking(ctx, req)
 	if err != nil {
-		log.Printf("CreateBooking: error creating booking: %v", err)
-		if err.Error() == message.Unauthorized {
-			response.Error(w, http.StatusUnauthorized, message.Unauthorized)
-		} else if err.Error() == fmt.Sprintf(message.NotFound, "identity") {
-			response.Error(w, http.StatusNotFound, fmt.Sprintf(message.NotFound, "identity"))
-		} else {
-			response.Error(w, http.StatusInternalServerError, message.InternalError)
+		log.Printf("CreateBooking: error: %v", err)
+		errorMsg := err.Error()
+		if errorMsg == "Anda belum mengunggah KTP. Silakan unggah KTP terlebih dahulu untuk melanjutkan pemesanan." ||
+			errorMsg == "Identitas Anda sedang diverifikasi. Mohon tunggu proses selesai sebelum melakukan pemesanan." ||
+			errorMsg == "Identitas Anda ditolak. Silakan unggah ulang KTP yang valid untuk melanjutkan." {
+			response.Error(w, http.StatusBadRequest, errorMsg)
+			return
 		}
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
 		return
 	}
-	log.Printf("CreateBooking: booking created successfully")
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"code":    200,
-		"data":    dto,
-		"message": message.Success,
-		"success": true,
-	})
+	response.OK(w, detail, message.BookingCreated)
 }
 
 /*
@@ -480,26 +498,132 @@ GetDetailBooking
 menangani request untuk mendapatkan detail booking
 */
 func (h *CustomerHandler) GetDetailBooking(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GetDetailBooking: received request")
+	if r.Method != http.MethodGet {
+		response.BadRequest(w, message.MethodNotAllowed)
+		return
+	}
 	vars := mux.Vars(r)
 	bookingID := vars["id"]
-
+	if strings.TrimSpace(bookingID) == "" {
+		log.Printf("GetDetailBooking: booking ID required")
+		response.BadRequest(w, fmt.Sprintf(message.Required, "booking ID"))
+		return
+	}
 	ctx := r.Context()
 	bookingDetail, err := h.service.GetDetailBooking(ctx, bookingID)
 	if err != nil {
-		// Handle error, e.g., send error response
-		http.Error(w, message.Unauthorized, http.StatusUnauthorized) // Adjust status code as needed
+		log.Printf("GetDetailBooking: error: %v", err)
+		if err.Error() == message.Unauthorized {
+			response.Error(w, http.StatusUnauthorized, message.Unauthorized)
+		} else if err.Error() == fmt.Sprintf(message.NotFound, "booking") {
+			response.Error(w, http.StatusNotFound, fmt.Sprintf(message.NotFound, "booking"))
+		} else {
+			response.Error(w, http.StatusInternalServerError, message.InternalError)
+		}
 		return
 	}
+	log.Printf("GetDetailBooking: retrieved booking detail for ID %s", bookingID)
+	response.OK(w, bookingDetail, message.Success)
+}
 
-	// Respond with JSON
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"code":    200,
-		"data":    bookingDetail,
-		"message": message.Success,
-		"success": true,
-	})
+/*
+VerifyEmail
+memverifikasi email customer dengan OTP
+*/
+func (h *CustomerHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	log.Printf("VerifyEmail: received request")
+	if r.Method != http.MethodPost {
+		response.BadRequest(w, message.MethodNotAllowed)
+		return
+	}
+	var req VerifyEmailRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		log.Printf("VerifyEmail: invalid JSON: %v", err)
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+	if req.Email == "" || req.OTP == "" {
+		log.Printf("VerifyEmail: email or OTP empty")
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+	err := h.service.SendOTP(req.Email, req.OTP)
+	if err != nil {
+		log.Printf("VerifyEmail: error: %v", err)
+		response.BadRequest(w, err.Error())
+		return
+	}
+	log.Printf("VerifyEmail: email %s verified successfully", req.Email)
+	response.OK(w, nil, message.OTPAlreadyVerified)
+}
+
+/*
+SendOTP
+memverifikasi email customer dengan OTP
+*/
+func (h *CustomerHandler) SendOTP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("SendOTP: received request")
+	if r.Method != http.MethodPost {
+		response.BadRequest(w, message.MethodNotAllowed)
+		return
+	}
+	var req SendOTPRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		log.Printf("SendOTP: invalid JSON: %v", err)
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+	if req.Email == "" || req.OTP == "" {
+		log.Printf("SendOTP: email or OTP empty")
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+	err := h.service.SendOTP(req.Email, req.OTP)
+	if err != nil {
+		log.Printf("SendOTP: error: %v", err)
+		response.BadRequest(w, err.Error())
+		return
+	}
+	log.Printf("SendOTP: email %s verified successfully", req.Email)
+	response.OK(w, nil, message.OTPAlreadyVerified)
+}
+
+/*
+ResendOTP
+mengirim ulang OTP untuk email customer
+*/
+func (h *CustomerHandler) ResendOTP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("ResendOTP: received request")
+	if r.Method != http.MethodPost {
+		response.BadRequest(w, message.MethodNotAllowed)
+		return
+	}
+	var req ResendOTPRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		log.Printf("ResendOTP: invalid JSON: %v", err)
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+	if req.Email == "" {
+		log.Printf("ResendOTP: email required")
+		response.BadRequest(w, fmt.Sprintf(message.Required, "email"))
+		return
+	}
+	resp, err := h.service.ResendOTP(req.Email)
+	if err != nil {
+		log.Printf("ResendOTP: error: %v", err)
+		response.BadRequest(w, err.Error())
+		return
+	}
+	log.Printf("ResendOTP: OTP resent for email %s", req.Email)
+	response.OK(w, resp, fmt.Sprintf(message.OTPResent, req.Email))
 }
 
 /*

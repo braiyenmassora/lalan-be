@@ -94,3 +94,15 @@ func Success(w http.ResponseWriter, code int, data any, msg string) {
 		Success: true,
 	})
 }
+
+/*
+NoFound
+mengirim respons not found 404
+*/
+func NotFound(w http.ResponseWriter, msg string) {
+	writeJSON(w, http.StatusNotFound, Response{
+		Code:    http.StatusNotFound,
+		Message: msg,
+		Success: false,
+	})
+}

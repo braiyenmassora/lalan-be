@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -36,12 +37,22 @@ func (r *customerRespository) CreateCustomer(customer *model.CustomerModel) erro
 			email,
 			password_hash,
 			profile_photo,
+			email_verified,
+			verification_token,
+			verification_expire,
 			created_at,
 			updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at, updated_at
 	`
-	err := r.db.QueryRow(query, customer.FullName, customer.Address, customer.PhoneNumber, customer.Email, customer.PasswordHash, customer.ProfilePhoto, customer.CreatedAt, customer.UpdatedAt).Scan(&customer.ID, &customer.CreatedAt, &customer.UpdatedAt)
+	err := r.db.QueryRow(query, customer.FullName, customer.Address, customer.PhoneNumber, customer.Email, customer.PasswordHash, customer.ProfilePhoto, customer.EmailVerified, customer.VerificationToken, customer.VerificationExpiresAt, customer.CreatedAt, customer.UpdatedAt).Scan(&customer.ID, &customer.CreatedAt, &customer.UpdatedAt)
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint \"customers_email_key\"") {
+			return fmt.Errorf("email already exists")
+		}
+		log.Printf("CreateCustomer: error creating customer: %v", err)
+		return err
+	}
 	log.Printf("CreateCustomer: inserted customer with email %s, ID %s", customer.Email, customer.ID)
 	return err
 }
@@ -65,6 +76,9 @@ func (r *customerRespository) FindByEmailCustomerForLogin(email string) (*model.
 			password_hash,
 			profile_photo,
 			address,
+			email_verified,
+			verification_token,
+			verification_expire,
 			created_at,
 			updated_at
 		FROM customer
@@ -102,6 +116,9 @@ func (r *customerRespository) GetDetailCustomer(id string) (*model.CustomerModel
             email,
             password_hash,
             profile_photo,
+            email_verified,
+            verification_token,
+            verification_expire,
             created_at,
             updated_at
         FROM customer
@@ -187,14 +204,14 @@ func (r *customerRespository) CreateIdentity(identity *model.IdentityModel) erro
             ktp_url,
             verified,
             status,
-            rejected_reason,
+            reason,
             verified_at,
             created_at,
             updated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING id, created_at, updated_at
     `
-	err = r.db.QueryRow(query, identity.UserID, identity.KTPURL, identity.Verified, identity.Status, identity.RejectedReason, identity.VerifiedAt, identity.CreatedAt, identity.UpdatedAt).Scan(&identity.ID, &identity.CreatedAt, &identity.UpdatedAt)
+	err = r.db.QueryRow(query, identity.UserID, identity.KTPURL, identity.Verified, identity.Status, identity.Reason, identity.VerifiedAt, identity.CreatedAt, identity.UpdatedAt).Scan(&identity.ID, &identity.CreatedAt, &identity.UpdatedAt)
 	if err != nil {
 		log.Printf("CreateIdentity: error inserting identity for user %s: %v", identity.UserID, err)
 		return err
@@ -239,7 +256,7 @@ func (r *customerRespository) GetIdentityByUserID(userID string) (*model.Identit
             ktp_url,
             verified,
             status,
-            rejected_reason,
+            reason,
             verified_at,
             created_at,
             updated_at
@@ -280,13 +297,13 @@ func (r *customerRespository) CreateBooking(booking *model.BookingModel, items [
             id, code, hoster_id, locked_until,
             start_date, end_date, total_days,
             delivery_type,
-            rental, deposit, delivery, discount, total, outstanding,
+            rental, deposit, discount, total, outstanding,
             user_id, identity_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
     `
 	log.Printf("CreateBooking: executing query: %s", queryBooking)
 	_, err = tx.Exec(queryBooking, booking.ID, booking.Code, booking.HosterID, booking.LockedUntil, booking.StartDate, booking.EndDate, booking.TotalDays, booking.DeliveryType,
-		booking.Rental, booking.Deposit, booking.Delivery, booking.Discount, booking.Total, booking.Outstanding, booking.UserID, booking.IdentityID)
+		booking.Rental, booking.Deposit, booking.Discount, booking.Total, booking.Outstanding, booking.UserID, booking.IdentityID)
 	if err != nil {
 		log.Printf("CreateBooking: error inserting booking: %v", err)
 		return nil, err
@@ -317,11 +334,11 @@ func (r *customerRespository) CreateBooking(booking *model.BookingModel, items [
 	*/
 	queryCustomer := `
         INSERT INTO booking_customer (
-            id, booking_id, name, phone, email, delivery_address, notes
+            id, booking_id, name, phone, email, address, notes
         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
     `
-	log.Printf("CreateBooking: inserting customer: %s, %s, %s, %s, %s, %s, %s", customer.ID, customer.BookingID, customer.Name, customer.Phone, customer.Email, customer.DeliveryAddress, customer.Notes)
-	_, err = tx.Exec(queryCustomer, customer.ID, customer.BookingID, customer.Name, customer.Phone, customer.Email, customer.DeliveryAddress, customer.Notes)
+	log.Printf("CreateBooking: inserting customer: %s, %s, %s, %s, %s, %s, %s", customer.ID, customer.BookingID, customer.Name, customer.Phone, customer.Email, customer.Address, customer.Notes)
+	_, err = tx.Exec(queryCustomer, customer.ID, customer.BookingID, customer.Name, customer.Phone, customer.Email, customer.Address, customer.Notes)
 	if err != nil {
 		log.Printf("CreateBooking: error inserting customer: %v", err)
 		return nil, err
@@ -333,12 +350,12 @@ func (r *customerRespository) CreateBooking(booking *model.BookingModel, items [
 	*/
 	queryIdentity := `
         INSERT INTO booking_identity (
-            id, booking_id, uploaded, status, rejection_reason,
-            reupload_allowed, estimated_time, status_check_url
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            id, booking_id, uploaded, status, reason,
+            reupload_allowed, estimated_time, status_check_url, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     `
-	log.Printf("CreateBooking: inserting identity: %s, %s, %t, %s, %v, %t, %s, %s", identity.ID, identity.BookingID, identity.Uploaded, identity.Status, identity.RejectionReason, identity.ReuploadAllowed, identity.EstimatedTime, identity.StatusCheckURL)
-	_, err = tx.Exec(queryIdentity, identity.ID, identity.BookingID, identity.Uploaded, identity.Status, identity.RejectionReason, identity.ReuploadAllowed, identity.EstimatedTime, identity.StatusCheckURL)
+	log.Printf("CreateBooking: inserting identity: %s, %s, %t, %s, %v, %t, %s, %s, %s, %s", identity.ID, identity.BookingID, identity.Uploaded, identity.Status, identity.Reason, identity.ReuploadAllowed, identity.EstimatedTime, identity.StatusCheckURL, identity.CreatedAt, identity.UpdatedAt)
+	_, err = tx.Exec(queryIdentity, identity.ID, identity.BookingID, identity.Uploaded, identity.Status, identity.Reason, identity.ReuploadAllowed, identity.EstimatedTime, identity.StatusCheckURL, identity.CreatedAt, identity.UpdatedAt)
 	if err != nil {
 		log.Printf("CreateBooking: error inserting identity: %v", err)
 		return nil, err
@@ -370,7 +387,22 @@ func (r *customerRespository) GetBookingsByUserID(userID string) ([]model.Bookin
 	  GetBookingsByUserID query
 	  mengambil daftar booking berdasarkan user ID
 	*/
-	query := `SELECT b.id, b.code, b.start_date, b.end_date, b.total_days, b.delivery_type, b.total, b.outstanding, b.created_at, bc.name AS customer_name, bc.phone AS customer_phone, bc.email AS customer_email, bc.delivery_address FROM booking b LEFT JOIN booking_customer bc ON b.id = bc.booking_id WHERE b.user_id = $1 ORDER BY b.created_at DESC`
+	query := `
+        SELECT 
+            b.code, 
+            b.start_date,
+            b.end_date,
+            b.total, 
+            bid.status AS identity_status,
+            string_agg(bi.name, ', ') AS item_summary, 
+            sum(bi.quantity) AS quantity
+        FROM booking b
+        LEFT JOIN booking_item bi ON b.id = bi.booking_id
+        LEFT JOIN booking_identity bid ON b.id = bid.booking_id
+        WHERE b.user_id = $1
+        GROUP BY b.id, b.code, b.start_date, b.end_date, b.total, bid.status
+        ORDER BY b.created_at DESC
+    `
 	var bookings []model.BookingListDTO
 	err := r.db.Select(&bookings, query, userID)
 	if err != nil {
@@ -393,16 +425,16 @@ func (r *customerRespository) GetListBookings() ([]model.BookingListDTO, error) 
 	query := `
         SELECT 
             b.code, 
-            b.created_at, 
-            b.updated_at, 
+            b.start_date,
+            b.end_date,
             b.total, 
-            string_agg(bi.name, ', ') AS item_name, 
-            sum(bi.quantity) AS quantity, 
-            bid.status AS ktp_status
+            bid.status AS identity_status,
+            string_agg(bi.name, ', ') AS item_summary, 
+            sum(bi.quantity) AS quantity
         FROM booking b
         LEFT JOIN booking_item bi ON b.id = bi.booking_id
         LEFT JOIN booking_identity bid ON b.id = bid.booking_id
-        GROUP BY b.id, b.code, b.created_at, b.updated_at, b.total, bid.status
+        GROUP BY b.id, b.code, b.start_date, b.end_date, b.total, bid.status
         ORDER BY b.created_at DESC
     `
 	var bookings []model.BookingListDTO
@@ -430,17 +462,80 @@ func (r *customerRespository) UpdateIdentity(identity *model.IdentityModel) erro
             ktp_url = $1,
             verified = $2,
             status = $3,
-            rejected_reason = $4,
+            reason = $4,
             verified_at = $5,
             updated_at = NOW()
         WHERE id = $6
     `
-	_, err := r.db.Exec(query, identity.KTPURL, identity.Verified, identity.Status, identity.RejectedReason, identity.VerifiedAt, identity.ID)
+	_, err := r.db.Exec(query, identity.KTPURL, identity.Verified, identity.Status, identity.Reason, identity.VerifiedAt, identity.ID)
 	if err != nil {
 		log.Printf("UpdateIdentity: error updating identity: %v", err)
 		return err
 	}
 	log.Printf("UpdateIdentity: updated identity %s", identity.ID)
+	return nil
+}
+
+/*
+SendOTP
+memverifikasi email customer dengan OTP
+*/
+func (r *customerRespository) SendOTP(email string, otp string) error {
+	/*
+	   SendOTP query
+	   memverifikasi email customer dengan OTP
+	*/
+	query := `
+        UPDATE customer
+        SET
+            email_verified = true,
+            verification_token = '',
+            verification_expire = NULL,
+            updated_at = NOW()
+        WHERE email = $1 AND verification_token = $2 AND verification_expire > NOW()
+    `
+	result, err := r.db.Exec(query, email, otp)
+	if err != nil {
+		log.Printf("SendOTP: error verifying email %s: %v", email, err)
+		return err
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		log.Printf("SendOTP: invalid or expired OTP for email %s", email)
+		return fmt.Errorf("invalid or expired OTP")
+	}
+	log.Printf("SendOTP: email %s verified successfully", email)
+	return nil
+}
+
+/*
+ResendOTP
+mengirim ulang OTP dengan token baru dan waktu kadaluarsa
+*/
+func (r *customerRespository) ResendOTP(email string, newOTP string, expireTime time.Time) error {
+	/*
+	  ResendOTP query
+	  memperbarui token verifikasi dan waktu kadaluarsa untuk email
+	*/
+	query := `
+        UPDATE customer
+        SET
+            verification_token = $1,
+            verification_expire = $2,
+            updated_at = NOW()
+        WHERE email = $3
+    `
+	result, err := r.db.Exec(query, newOTP, expireTime, email)
+	if err != nil {
+		log.Printf("ResendOTP: error updating OTP for email %s: %v", email, err)
+		return err
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		log.Printf("ResendOTP: no customer found for email %s", email)
+		return fmt.Errorf("customer not found")
+	}
+	log.Printf("ResendOTP: OTP resent for email %s", email)
 	return nil
 }
 
@@ -472,7 +567,7 @@ func (r *customerRespository) GetBookingDetail(bookingID string) (*model.Booking
 	var booking model.BookingModel
 	queryBooking := `
         SELECT id, code, hoster_id, locked_until, start_date, end_date, total_days, delivery_type,
-               rental, deposit, delivery, discount, total, outstanding, user_id, identity_id,
+               rental, deposit, discount, total, outstanding, user_id, identity_id,
                created_at, updated_at
         FROM booking WHERE id = $1
     `
@@ -506,7 +601,7 @@ func (r *customerRespository) GetBookingDetail(bookingID string) (*model.Booking
 	// Query customer
 	var customer model.BookingCustomer
 	queryCustomer := `
-        SELECT id, booking_id, name, phone, email, delivery_address, notes
+        SELECT id, booking_id, name, phone, email, address, notes
         FROM booking_customer WHERE booking_id = $1
     `
 	err = r.db.Get(&customer, queryCustomer, bookingID)
@@ -518,7 +613,7 @@ func (r *customerRespository) GetBookingDetail(bookingID string) (*model.Booking
 	// Query identity
 	var identity model.BookingIdentity
 	queryIdentity := `
-        SELECT id, booking_id, uploaded, status, rejection_reason, reupload_allowed,
+        SELECT id, booking_id, uploaded, status, reason, reupload_allowed,
                estimated_time, status_check_url, created_at, updated_at
         FROM booking_identity WHERE booking_id = $1
     `
@@ -558,6 +653,8 @@ type CustomerRepository interface {
 	UpdateIdentity(identity *model.IdentityModel) error
 	GetHosterIDByItemID(itemID string) (string, error)
 	GetBookingDetail(bookingID string) (*model.BookingDetailDTO, error)
+	SendOTP(email string, otp string) error
+	ResendOTP(email string, newOTP string, expireTime time.Time) error
 }
 
 /*

@@ -2,6 +2,7 @@
 CREATE TABLE booking (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     code VARCHAR NOT NULL,
+    hoster_id UUID NOT NULL REFERENCES hosters(id),
     locked_until TIMESTAMP NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
@@ -9,12 +10,10 @@ CREATE TABLE booking (
     delivery_type VARCHAR NOT NULL,
     rental INTEGER NOT NULL,
     deposit INTEGER NOT NULL,
-    delivery INTEGER NOT NULL,
     discount INTEGER NOT NULL,
     total INTEGER NOT NULL,
     outstanding INTEGER NOT NULL,
     user_id UUID NOT NULL REFERENCES customer(id),
-    hoster_id UUID NOT NULL REFERENCES hosters(id),  -- kolom baru
     identity_id UUID REFERENCES identity(id),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()

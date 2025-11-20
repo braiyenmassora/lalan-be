@@ -14,6 +14,8 @@ func SetupCustomerRoutes(router *mux.Router, handler *CustomerHandler) {
 	public := router.PathPrefix("/api/v1/customer").Subrouter()
 	public.HandleFunc("/register", handler.CreateCustomer).Methods("POST")
 	public.HandleFunc("/login", handler.LoginCustomer).Methods("POST")
+	public.HandleFunc("/verify-otp", handler.VerifyEmail).Methods("POST")
+	public.HandleFunc("/resend-otp", handler.ResendOTP).Methods("POST")
 
 	protected := router.PathPrefix("/api/v1/customer").Subrouter()
 	protected.Use(middleware.JWTMiddleware)

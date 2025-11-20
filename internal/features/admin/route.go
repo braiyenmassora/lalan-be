@@ -25,4 +25,8 @@ func SetupAdminRoutes(router *mux.Router, h *AdminHandler) {
 	protected.HandleFunc("/category/update", h.UpdateCategory).Methods("PUT")
 	protected.HandleFunc("/category/delete", h.DeleteCategory).Methods("DELETE")
 	protected.HandleFunc("/category", h.GetAllCategory).Methods("GET")
+
+	protected.HandleFunc("/identity/{user_id}", h.UpdateIdentityStatus).Methods("PUT")
+	protected.HandleFunc("/identity/{user_id}", h.GetIdentityByCustomerID).Methods("GET")
+
 }
