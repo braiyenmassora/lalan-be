@@ -1,57 +1,45 @@
-// config/redis.go
+// internal/config/redis.go
 package config
 
 import (
 	"context"
 	"crypto/tls"
 	"log"
-	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
-/*
-Redis
-client Redis global untuk seluruh aplikasi
-*/
 var Redis *redis.Client
-
-/*
-RedisCtx
-context default untuk operasi Redis
-*/
 var RedisCtx = context.Background()
 
 /*
 InitRedis
-menginisialisasi koneksi Redis dari environment dan memverifikasi dengan ping
+menginisialisasi koneksi Redis dengan timeout tinggi & TLS fleksibel untuk Render
 */
-
 func InitRedis() {
-	// Baca dari .env
-	host := MustGetEnv("REDIS_HOST")
-	portStr := GetEnv("REDIS_PORT", "6379")
-	username := GetEnv("REDIS_USERNAME", "")
-	password := GetEnv("REDIS_PASSWORD", "")
+	url := MustGetEnv("REDIS_URL")
 
-	port, _ := strconv.Atoi(portStr)
-
-	Redis = redis.NewClient(&redis.Options{
-		Addr:     host + ":" + strconv.Itoa(port),
-		Username: username,
-		Password: password,
-		DB:       0,
-		TLSConfig: &tls.Config{
-			InsecureSkipVerify: true, // Render free tier butuh ini
-		},
-		DialTimeout:  20 * time.Second,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-	})
-
-	_, err := Redis.Ping(RedisCtx).Result()
+	opt, err := redis.ParseURL(url)
 	if err != nil {
+		log.Fatalf("Invalid Redis URL: %v", err)
+	}
+
+	// FIX 100% UNTUK RENDER REDIS
+	opt.DialTimeout = 30 * time.Second // dari 5s → 30s
+	opt.ReadTimeout = 10 * time.Second
+	opt.WriteTimeout = 10 * time.Second
+	opt.TLSConfig = &tls.Config{
+		InsecureSkipVerify: true, // WAJIB TRUE untuk Render Redis internal (cert issue)
+		MinVersion:         tls.VersionTLS12,
+	}
+
+	Redis = redis.NewClient(opt)
+
+	ctx, cancel := context.WithTimeout(RedisCtx, 30*time.Second)
+	defer cancel()
+
+	if err := Redis.Ping(ctx).Err(); err != nil {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
 
