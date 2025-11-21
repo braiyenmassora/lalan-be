@@ -15,11 +15,15 @@ WORKDIR /usr/src/app
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy all source code
+# Copy all source code (pastikan cmd/ di-copy)
 COPY . .
 
-# Build the Go binary
-RUN go build -o app .
+# Debug: List files and find Go files
+RUN ls -la /usr/src/app
+RUN find /usr/src/app -name "*.go" -type f
+
+# Build the Go binary (build dari root, Go akan menemukan main.go di cmd/)
+RUN go build -o app ./cmd
 
 # -----------------------------
 # Stage 2: Minimal runtime image
