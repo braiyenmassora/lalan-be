@@ -3,7 +3,6 @@ package config
 
 import (
 	"context"
-	"crypto/tls"
 	"log"
 	"time"
 
@@ -20,19 +19,17 @@ menginisialisasi koneksi Redis dengan timeout tinggi & TLS fleksibel untuk Rende
 func InitRedis() {
 	url := MustGetEnv("REDIS_URL")
 
+	// Debug: pastikan ENV kebaca di Render
+	log.Println("REDIS_URL =", url)
+
 	opt, err := redis.ParseURL(url)
 	if err != nil {
 		log.Fatalf("Invalid Redis URL: %v", err)
 	}
 
-	// FIX 100% UNTUK RENDER REDIS
-	opt.DialTimeout = 30 * time.Second // dari 5s → 30s
+	opt.DialTimeout = 30 * time.Second
 	opt.ReadTimeout = 10 * time.Second
 	opt.WriteTimeout = 10 * time.Second
-	opt.TLSConfig = &tls.Config{
-		InsecureSkipVerify: true, // WAJIB TRUE untuk Render Redis internal (cert issue)
-		MinVersion:         tls.VersionTLS12,
-	}
 
 	Redis = redis.NewClient(opt)
 
