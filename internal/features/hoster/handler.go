@@ -8,9 +8,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 
+	"lalan-be/internal/config"
 	"lalan-be/internal/message"
 	"lalan-be/internal/model"
 	"lalan-be/internal/response"
@@ -110,13 +112,21 @@ func (h *HosterHandler) CreateHoster(w http.ResponseWriter, r *http.Request) {
 LoginHoster
 melakukan login hoster dengan validasi kredensial dan response token atau error
 */
+// LoginHoster — versi DEV (refresh_token masih keliatan di body)
 func (h *HosterHandler) LoginHoster(w http.ResponseWriter, r *http.Request) {
 	log.Printf("LoginHoster: received request")
+
 	if r.Method != http.MethodPost {
 		response.BadRequest(w, message.MethodNotAllowed)
 		return
 	}
-	var req LoginRequest
+
+	// === BAGIAN INI WAJIB ADA ===
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&req); err != nil {
@@ -124,40 +134,60 @@ func (h *HosterHandler) LoginHoster(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, message.BadRequest)
 		return
 	}
+
 	if req.Email == "" || req.Password == "" {
-		log.Printf("LoginHoster: email or password empty")
 		response.BadRequest(w, message.BadRequest)
 		return
 	}
+
+	// Validasi email
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	if !emailRegex.MatchString(req.Email) {
-		log.Printf("LoginHoster: invalid email format: %s", req.Email)
 		response.BadRequest(w, fmt.Sprintf(message.InvalidFormat, "email"))
 		return
 	}
+	// === SAMPE SINI ===
+
+	// Panggil service
 	resp, err := h.service.LoginHoster(req.Email, req.Password)
 	if err != nil {
 		log.Printf("LoginHoster: login failed: %v", err)
 		response.Unauthorized(w, message.LoginFailed)
 		return
 	}
-	log.Printf("LoginHoster: login successful for email %s", req.Email)
+
+	accessToken := resp.AccessToken
+	refreshToken := resp.RefreshToken
+
+	// Simpan ke Redis
+	config.Redis.Set(config.RedisCtx, "refresh:"+refreshToken, resp.ID+":"+resp.Role, 30*24*time.Hour)
+
+	// httpOnly cookie
 	http.SetCookie(w, &http.Cookie{
-		Name:     "auth_token",
-		Value:    resp.AccessToken,
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		Expires:  time.Now().Add(30 * 24 * time.Hour),
 		HttpOnly: true,
-		Secure:   true,
-		Path:     "/",
-		MaxAge:   3600,
+		Secure:   false, // dev
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/api/auth/refresh",
 	})
-	userData := map[string]interface{}{
-		"id":            resp.ID,
-		"access_token":  resp.AccessToken,
-		"refresh_token": resp.RefreshToken,
-		"token_type":    resp.TokenType,
+
+	// Hapus cookie lama
+	http.SetCookie(w, &http.Cookie{
+		Name: "auth_token", Value: "", MaxAge: -1, Path: "/",
+	})
+
+	log.Printf("LoginHoster: success → %s (id: %s)", req.Email, resp.ID)
+
+	// DEV MODE: tampilkan refresh_token di body
+	response.OK(w, map[string]interface{}{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken, // ← buat testing dev
 		"expires_in":    resp.ExpiresIn,
-	}
-	response.OK(w, userData, message.Success)
+		"id":            resp.ID,
+		"role":          resp.Role,
+	}, "Login successful (DEV MODE)")
 }
 
 /*

@@ -60,31 +60,41 @@ func NewHosterService(repo HosterRepository) HosterService {
 generateTokenHoster
 menghasilkan JWT token untuk hoster
 */
+// di hoster/service.go — ganti fungsi generateTokenHoster kamu
 func (s *hosterService) generateTokenHoster(userID string) (*HosterResponse, error) {
-	exp := time.Now().Add(1 * time.Hour)
-
-	claims := middleware.Claims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   userID,
-			ExpiresAt: jwt.NewNumericDate(exp),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-		Role: "hoster",
+	// Access Token — 15 menit
+	accessToken, err := s.generateJWT(userID, "hoster", 15*time.Minute)
+	if err != nil {
+		return nil, err
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	accessToken, err := token.SignedString(config.GetJWTSecret())
+	// Refresh Token — 30 hari (JWT juga, biar bisa verify tanpa DB)
+	refreshToken, err := s.generateJWT(userID, "hoster", 30*24*time.Hour)
 	if err != nil {
-		return nil, errors.New(message.InternalError)
+		return nil, err
 	}
 
 	return &HosterResponse{
 		ID:           userID,
 		AccessToken:  accessToken,
-		RefreshToken: uuid.New().String(),
+		RefreshToken: refreshToken,
+		ExpiresIn:    900, // 15 menit
 		TokenType:    "Bearer",
-		ExpiresIn:    3600,
+		Role:         "hoster",
 	}, nil
+}
+
+// Helper generate JWT (pakai secret dari env)
+func (s *hosterService) generateJWT(userID, role string, expires time.Duration) (string, error) {
+	claims := jwt.MapClaims{
+		"sub":  userID,
+		"role": role,
+		"exp":  time.Now().Add(expires).Unix(),
+		"iat":  time.Now().Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(config.GetJWTSecret())
 }
 
 /*
@@ -519,6 +529,7 @@ type HosterResponse struct {
 	ID           string `json:"id"`
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
-	TokenType    string `json:"token_type"`
 	ExpiresIn    int    `json:"expires_in"`
+	TokenType    string `json:"token_type"`
+	Role         string `json:"role"`
 }

@@ -9,78 +9,96 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gorilla/mux"
-
 	"lalan-be/internal/config"
 	"lalan-be/internal/features/admin"
 	"lalan-be/internal/features/customer"
 	"lalan-be/internal/features/hoster"
 	"lalan-be/internal/features/public"
 	"lalan-be/internal/middleware"
+
+	"github.com/gorilla/mux"
 )
 
 /*
 main
-menjalankan aplikasi server dengan inisialisasi dan shutdown graceful
+entry point aplikasi yang menginisialisasi semua komponen dan menjalankan server dengan graceful shutdown
 */
 func main() {
+
+	/*
+		LoadEnv & InitRedis
+		memuat environment dan menginisialisasi koneksi Redis
+	*/
 	config.LoadEnv()
+	config.InitRedis()
+
+	/*
+		DatabaseConfig
+		membuat koneksi ke PostgreSQL
+	*/
 	cfg, err := config.DatabaseConfig()
 	if err != nil {
 		log.Fatalf("DB connection failed: %v", err)
 	}
-	db := cfg.DB
-	defer db.Close()
-	log.Printf(
-		"Database connected → host=%s port=%d db=%s sslmode=%s",
-		cfg.Host,
-		cfg.Port,
-		cfg.DBName,
-		cfg.SSLMode,
-	)
+	defer cfg.DB.Close()
 
-	AdminRepo := admin.NewAdminRepository(db)
-	AdminService := admin.NewAdminService(AdminRepo)
-	AdminHandler := admin.NewAdminHandler(AdminService)
+	/*
+		Handler
+		membuat semua handler dengan service dan repository
+	*/
+	AdminHandler := admin.NewAdminHandler(admin.NewAdminService(admin.NewAdminRepository(cfg.DB)))
+	HosterHandler := hoster.NewHosterHandler(hoster.NewHosterService(hoster.NewHosterRepository(cfg.DB)))
+	CustomerHandler := customer.NewCustomerHandler(customer.NewCustomerService(customer.NewCustomerRepository(cfg.DB)))
+	PublicHandler := public.NewPublicHandler(public.NewPublicService(public.NewPublicRepository(cfg.DB)))
 
-	HosterRepo := hoster.NewHosterRepository(db)
-	HosterService := hoster.NewHosterService(HosterRepo)
-	HosterHandler := hoster.NewHosterHandler(HosterService)
+	/*
+		Router
+		membuat router dan menambahkan middleware CORS
+	*/
+	r := mux.NewRouter()
+	r.Use(middleware.CORSMiddleware)
 
-	CustomerRepo := customer.NewCustomerRepository(db)
-	CustomerService := customer.NewCustomerService(CustomerRepo)
-	CustomerHandler := customer.NewCustomerHandler(CustomerService)
+	/*
+		SetupRoutes
+		mendaftarkan semua route dari setiap fitur
+	*/
+	admin.SetupAdminRoutes(r, AdminHandler)
+	hoster.SetupHosterRoutes(r, HosterHandler)
+	customer.SetupCustomerRoutes(r, CustomerHandler)
+	public.SetupPublicRoutes(r, PublicHandler)
 
-	PublicRepo := public.NewPublicRepository(db)
-	PublicService := public.NewPublicService(PublicRepo)
-	PublicHandler := public.NewPublicHandler(PublicService)
-
-	router := mux.NewRouter()
-	router.Use(middleware.CORSMiddleware)
-
-	admin.SetupAdminRoutes(router, AdminHandler)
-	hoster.SetupHosterRoutes(router, HosterHandler)
-	customer.SetupCustomerRoutes(router, CustomerHandler)
-	public.SetupPublicRoutes(router, PublicHandler)
-
+	/*
+		http.Server
+		menjalankan server di port 8080
+	*/
 	srv := &http.Server{
 		Addr:    ":8080",
-		Handler: router,
+		Handler: r,
 	}
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
 	go func() {
 		log.Println("Server running at http://localhost:8080")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server failed: %v", err)
+			log.Fatalf("Server crashed: %v", err)
 		}
 	}()
-	<-c
+
+	<-stop
 	log.Println("Shutting down server...")
+
+	/*
+		Graceful Shutdown
+		menghentikan server dengan timeout 30 detik
+	*/
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
-	log.Println("Server exited")
+
+	log.Println("Server stopped gracefully")
 }
