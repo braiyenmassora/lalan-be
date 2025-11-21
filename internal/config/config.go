@@ -2,16 +2,18 @@ package config
 
 import (
 	"fmt"
-	"lalan-be/internal/message"
+	"log"
 	"os"
+
+	"lalan-be/internal/message"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
 
 /*
-type Config
-menyimpan parameter koneksi dan instance database untuk PostgreSQL
+Config
+menyimpan koneksi database dan parameter konfigurasi PostgreSQL
 */
 type Config struct {
 	DB      *sqlx.DB
@@ -25,7 +27,7 @@ type Config struct {
 
 /*
 DatabaseConfig
-menginisialisasi dan mengembalikan konfigurasi database jika koneksi berhasil
+membuat koneksi ke PostgreSQL menggunakan variabel environment dan mengembalikan konfigurasi database
 */
 func DatabaseConfig() (*Config, error) {
 	user := MustGetEnv("DB_USER")
@@ -33,22 +35,29 @@ func DatabaseConfig() (*Config, error) {
 	host := MustGetEnv("DB_HOST")
 	port := MustGetEnv("DB_PORT")
 	name := MustGetEnv("DB_NAME")
+
 	ssl := os.Getenv("DB_SSL_MODE")
 	if ssl == "" {
 		ssl = "require"
 	}
+
 	dsn := fmt.Sprintf(
 		"postgresql://%s:%s@%s:%s/%s?sslmode=%s",
 		user, pass, host, port, name, ssl,
 	)
+
 	db, err := sqlx.Connect("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", message.InternalError, err)
 	}
+
 	if err := db.Ping(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("%s: %w", message.InternalError, err)
 	}
+
+	log.Println("Database connected successfully")
+
 	return &Config{
 		DB:      db,
 		User:    user,
