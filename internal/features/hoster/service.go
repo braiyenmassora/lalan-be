@@ -44,6 +44,8 @@ type HosterService interface {
 	UpdateTermsAndConditions(ctx context.Context, id string, input *model.TermsAndConditionsModel) (*model.TermsAndConditionsModel, error)
 	DeleteTermsAndConditions(ctx context.Context, id string) error
 	GetIdentityCustomer(ctx context.Context, userID string) (*model.IdentityModel, error)
+	GetListBookingsCustomer(ctx context.Context, limit int, offset int) ([]model.BookingListCustomer, error)
+	GetListBookingsCustomerByBookingID(ctx context.Context, bookingID string, limit int, offset int) ([]model.BookingDetailCustomer, error)
 }
 
 /*
@@ -453,6 +455,60 @@ func (s *hosterService) GetIdentityCustomer(ctx context.Context, userID string) 
 	}
 
 	return identity, nil
+}
+
+/*
+GetListBookingsForHoster
+mengambil daftar booking yang dimiliki oleh hoster berdasarkan context dengan limit dan offset
+*/
+func (s *hosterService) GetListBookingsForHoster(ctx context.Context, limit int, offset int) ([]model.BookingListCustomer, error) {
+	userID, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		return nil, errors.New(message.Unauthorized)
+	}
+
+	bookings, err := s.repo.GetListBookingsCustomer(userID, limit, offset)
+	if err != nil {
+		return nil, errors.New(message.InternalError)
+	}
+
+	return bookings, nil
+}
+
+/*
+GetListBookingsCustomer
+mengambil daftar booking yang dimiliki oleh hoster berdasarkan context dengan limit dan offset
+*/
+func (s *hosterService) GetListBookingsCustomer(ctx context.Context, limit int, offset int) ([]model.BookingListCustomer, error) {
+	userID, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		return nil, errors.New(message.Unauthorized)
+	}
+
+	bookings, err := s.repo.GetListBookingsCustomer(userID, limit, offset)
+	if err != nil {
+		return nil, errors.New(message.InternalError)
+	}
+
+	return bookings, nil
+}
+
+/*
+GetListBookingsCustomerByBookingID
+mengambil daftar booking yang dimiliki oleh hoster berdasarkan context dan booking ID dengan limit dan offset
+*/
+func (s *hosterService) GetListBookingsCustomerByBookingID(ctx context.Context, bookingID string, limit int, offset int) ([]model.BookingDetailCustomer, error) {
+	hosterID, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		return nil, errors.New(message.Unauthorized)
+	}
+
+	bookings, err := s.repo.GetListBookingsCustomerByBookingID(hosterID, bookingID, limit, offset)
+	if err != nil {
+		return nil, errors.New(message.InternalError)
+	}
+
+	return bookings, nil
 }
 
 /*

@@ -32,4 +32,6 @@ func SetupHosterRoutes(router *mux.Router, handler *HosterHandler) {
 	protected.HandleFunc("/tnc/{id}", handler.UpdateTermsAndConditions).Methods("PUT")
 	protected.HandleFunc("/tnc/{id}", handler.DeleteTermsAndConditions).Methods("DELETE")
 
+	protected.HandleFunc("/booking", handler.GetListBookingsCustomer).Methods("GET")
+	protected.HandleFunc("/booking/{bookingID}", handler.GetListBookingsCustomerByBookingID).Methods("GET")
 }
