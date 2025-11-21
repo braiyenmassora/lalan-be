@@ -697,6 +697,198 @@ func (r *hosterRespository) UpdateBookingIdentityStatusByUserID(userID, status s
 }
 
 /*
+GetListBookingsForHoster
+mengambil daftar booking yang dimiliki oleh hoster berdasarkan user ID hoster dengan limit dan offset
+*/
+func (r *hosterRespository) GetListBookingsForHoster(userID string, limit int, offset int) ([]model.BookingListCustomer, error) {
+	/*
+	   GetListBookingsForHoster query
+	   mengambil daftar booking dengan agregasi item untuk hoster tertentu
+	*/
+	query := `
+SELECT
+    b.code,
+    b.user_id AS customer_id,
+    bc.name AS customer_name,
+    b.start_date,
+    b.end_date,
+    b.total_days AS duration_days,
+    b.total,
+    i.status AS identity_status,
+    COALESCE(bi.item_summary, '') AS item_summary,
+    COALESCE(bi.quantity, 0) AS quantity
+FROM booking b
+LEFT JOIN booking_customer bc ON bc.booking_id = b.id
+LEFT JOIN booking_identity i ON i.booking_id = b.id
+LEFT JOIN (
+    SELECT booking_id, 
+           string_agg(name || ' x' || quantity, ', ') AS item_summary,
+           SUM(quantity) AS quantity
+    FROM booking_item
+    GROUP BY booking_id
+) bi ON bi.booking_id = b.id
+WHERE b.hoster_id = $1
+ORDER BY b.created_at DESC
+LIMIT $2 OFFSET $3
+`
+
+	var bookings []model.BookingListCustomer
+	err := r.db.Select(&bookings, query, userID, limit, offset)
+	if err != nil {
+		log.Printf("GetListBookingsForHoster: error: %v", err)
+		return nil, err
+	}
+	log.Printf("GetListBookingsForHoster: found %d bookings for hoster %s", len(bookings), userID)
+	return bookings, nil
+}
+
+/*
+GetListBookingsForHosterByCustomerID
+mengambil daftar booking yang dimiliki oleh hoster berdasarkan hoster ID dan customer ID dengan limit dan offset
+*/
+func (r *hosterRespository) GetListBookingsForHosterByCustomerID(hosterID string, customerID string, limit int, offset int) ([]model.BookingListCustomer, error) {
+	/*
+	   GetListBookingsForHosterByCustomerID query
+	   mengambil daftar booking dengan agregasi item untuk hoster tertentu dan customer tertentu
+	*/
+	query := `
+SELECT
+    b.code,
+    b.user_id AS customer_id,
+    bc.name AS customer_name,
+    b.start_date,
+    b.end_date,
+    b.total_days AS duration_days,
+    b.total,
+    i.status AS identity_status,
+    COALESCE(bi.item_summary, '') AS item_summary,
+    COALESCE(bi.quantity, 0) AS quantity
+FROM booking b
+LEFT JOIN booking_customer bc ON bc.booking_id = b.id
+LEFT JOIN booking_identity i ON i.booking_id = b.id
+LEFT JOIN (
+    SELECT booking_id, 
+           string_agg(name || ' x' || quantity, ', ') AS item_summary,
+           SUM(quantity) AS quantity
+    FROM booking_item
+    GROUP BY booking_id
+) bi ON bi.booking_id = b.id
+WHERE b.hoster_id = $1 AND b.user_id = $2
+ORDER BY b.created_at DESC
+LIMIT $3 OFFSET $4
+`
+
+	var bookings []model.BookingListCustomer
+	err := r.db.Select(&bookings, query, hosterID, customerID, limit, offset)
+	if err != nil {
+		log.Printf("GetListBookingsForHosterByCustomerID: error: %v", err)
+		return nil, err
+	}
+	log.Printf("GetListBookingsForHosterByCustomerID: found %d bookings for hoster %s and customer %s", len(bookings), hosterID, customerID)
+	return bookings, nil
+}
+
+/*
+GetListBookingsCustomer
+mengambil daftar booking yang dimiliki oleh hoster berdasarkan user ID hoster dengan limit dan offset
+*/
+func (r *hosterRespository) GetListBookingsCustomer(userID string, limit int, offset int) ([]model.BookingListCustomer, error) {
+	/*
+	   GetListBookingsCustomer query
+	   mengambil daftar booking dengan agregasi item untuk hoster tertentu
+	*/
+	query := `
+SELECT
+    b.id AS booking_id,
+    b.code,
+    b.user_id AS customer_id,
+    bc.name AS customer_name,
+    b.start_date,
+    b.end_date,
+    b.total_days AS duration_days,
+    b.total,
+    i.status AS identity_status,
+    COALESCE(bi.item_summary, '') AS item_summary,
+    COALESCE(bi.quantity, 0) AS quantity
+FROM booking b
+LEFT JOIN booking_customer bc ON bc.booking_id = b.id
+LEFT JOIN booking_identity i ON i.booking_id = b.id
+LEFT JOIN (
+    SELECT booking_id, 
+           string_agg(name || ' x' || quantity, ', ') AS item_summary,
+           SUM(quantity) AS quantity
+    FROM booking_item
+    GROUP BY booking_id
+) bi ON bi.booking_id = b.id
+WHERE b.hoster_id = $1
+ORDER BY b.created_at DESC
+LIMIT $2 OFFSET $3
+`
+
+	var bookings []model.BookingListCustomer
+	err := r.db.Select(&bookings, query, userID, limit, offset)
+	if err != nil {
+		log.Printf("GetListBookingsCustomer: error: %v", err)
+		return nil, err
+	}
+	log.Printf("GetListBookingsCustomer: found %d bookings for hoster %s", len(bookings), userID)
+	return bookings, nil
+}
+
+/*
+GetListBookingsCustomerByBookingID
+mengambil daftar booking yang dimiliki oleh hoster berdasarkan hoster ID dan booking ID dengan limit dan offset
+*/
+func (r *hosterRespository) GetListBookingsCustomerByBookingID(hosterID string, bookingID string, limit int, offset int) ([]model.BookingDetailCustomer, error) {
+	/*
+	   GetListBookingsCustomerByBookingID query
+	   mengambil daftar booking dengan agregasi item untuk hoster tertentu dan booking tertentu
+	*/
+	query := `
+SELECT
+    b.id AS booking_id,
+    b.code,
+    b.user_id AS customer_id,
+    bc.name AS customer_name,
+    bc.email AS customer_email,
+    bc.phone AS customer_phone,
+    b.start_date,
+    b.end_date,
+    b.total_days AS duration_days,
+    b.total,
+    i.status AS identity_status,
+    COALESCE(bi.item_summary, '') AS item_summary,
+    COALESCE(bi.quantity, 0) AS quantity,
+    b.delivery_type,
+    bc.address AS customer_address,
+    bc.notes AS customer_notes
+FROM booking b
+LEFT JOIN booking_customer bc ON bc.booking_id = b.id
+LEFT JOIN booking_identity i ON i.booking_id = b.id
+LEFT JOIN (
+    SELECT booking_id, 
+           string_agg(name || ' x' || quantity, ', ') AS item_summary,
+           SUM(quantity) AS quantity
+    FROM booking_item
+    GROUP BY booking_id
+) bi ON bi.booking_id = b.id
+WHERE b.hoster_id = $1 AND b.id = $2
+ORDER BY b.created_at DESC
+LIMIT $3 OFFSET $4
+`
+
+	var bookings []model.BookingDetailCustomer
+	err := r.db.Select(&bookings, query, hosterID, bookingID, limit, offset)
+	if err != nil {
+		log.Printf("GetListBookingsCustomerByBookingID: error: %v", err)
+		return nil, err
+	}
+	log.Printf("GetListBookingsCustomerByBookingID: found %d bookings for hoster %s and booking %s", len(bookings), hosterID, bookingID)
+	return bookings, nil
+}
+
+// ...existing code...
+/*
 HosterRepository
 mendefinisikan kontrak untuk akses data hoster
 */
@@ -720,6 +912,8 @@ type HosterRepository interface {
 	UpdateIdentityStatus(identityID string, status string, rejectedReason string, verified bool, verifiedAt *time.Time) error
 	UpdateBookingStatusByUserID(userID, status string) error
 	UpdateBookingIdentityStatusByUserID(userID, status string) error
+	GetListBookingsCustomer(userID string, limit int, offset int) ([]model.BookingListCustomer, error)
+	GetListBookingsCustomerByBookingID(hosterID string, bookingID string, limit int, offset int) ([]model.BookingDetailCustomer, error)
 }
 
 /*

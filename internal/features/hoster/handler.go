@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -447,6 +448,192 @@ func (h *HosterHandler) DeleteTermsAndConditions(w http.ResponseWriter, r *http.
 		return
 	}
 	response.OK(w, nil, fmt.Sprintf(message.Deleted, "terms and conditions"))
+}
+
+/*
+GetListBookingsForHoster
+mengambil daftar booking yang dimiliki oleh hoster berdasarkan konteks dengan pagination dan response data atau error
+*/
+func (h *HosterHandler) GetListBookingsForHoster(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GetListBookingsForHoster: received request")
+	if r.Method != http.MethodGet {
+		response.BadRequest(w, message.MethodNotAllowed)
+		return
+	}
+
+	// Parse query parameters for pagination
+	pageStr := r.URL.Query().Get("page")
+	limitStr := r.URL.Query().Get("limit")
+
+	page := 1
+	limit := 10
+
+	if pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	offset := (page - 1) * limit
+
+	ctx := r.Context()
+	bookings, err := h.service.GetListBookingsCustomer(ctx, limit, offset)
+	if err != nil {
+		log.Printf("GetListBookingsForHoster: error getting bookings: %v", err)
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
+		return
+	}
+	log.Printf("GetListBookingsForHoster: retrieved %d bookings for page %d", len(bookings), page)
+	response.OK(w, bookings, message.Success)
+}
+
+/*
+GetListBookingsForHosterByCustomerID
+mengambil daftar booking yang dimiliki oleh hoster berdasarkan konteks dan customer ID dengan pagination dan response data atau error
+*/
+func (h *HosterHandler) GetListBookingsForHosterByCustomerID(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GetListBookingsForHosterByCustomerID: received request")
+	if r.Method != http.MethodGet {
+		response.BadRequest(w, message.MethodNotAllowed)
+		return
+	}
+
+	vars := mux.Vars(r)
+	customerID := vars["customerID"]
+	if customerID == "" {
+		response.BadRequest(w, "customer ID is required")
+		return
+	}
+
+	// Parse query parameters for pagination
+	pageStr := r.URL.Query().Get("page")
+	limitStr := r.URL.Query().Get("limit")
+
+	page := 1
+	limit := 10
+
+	if pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	offset := (page - 1) * limit
+
+	ctx := r.Context()
+	bookings, err := h.service.GetListBookingsCustomerByBookingID(ctx, customerID, limit, offset)
+	if err != nil {
+		log.Printf("GetListBookingsForHosterByCustomerID: error getting bookings: %v", err)
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
+		return
+	}
+	log.Printf("GetListBookingsForHosterByCustomerID: retrieved %d bookings for customer %s", len(bookings), customerID)
+	response.OK(w, bookings, message.Success)
+}
+
+/*
+GetListBookingsCustomer
+mengambil daftar booking yang dimiliki oleh hoster berdasarkan konteks dengan pagination dan response data atau error
+*/
+func (h *HosterHandler) GetListBookingsCustomer(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GetListBookingsCustomer: received request")
+	if r.Method != http.MethodGet {
+		response.BadRequest(w, message.MethodNotAllowed)
+		return
+	}
+
+	// Parse query parameters for pagination
+	pageStr := r.URL.Query().Get("page")
+	limitStr := r.URL.Query().Get("limit")
+
+	page := 1
+	limit := 10
+
+	if pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	offset := (page - 1) * limit
+
+	ctx := r.Context()
+	bookings, err := h.service.GetListBookingsCustomer(ctx, limit, offset)
+	if err != nil {
+		log.Printf("GetListBookingsCustomer: error getting bookings: %v", err)
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
+		return
+	}
+	log.Printf("GetListBookingsCustomer: retrieved %d bookings for page %d", len(bookings), page)
+	response.OK(w, bookings, message.Success)
+}
+
+/*
+GetListBookingsCustomerByBookingID
+mengambil daftar booking yang dimiliki oleh hoster berdasarkan konteks dan booking ID dengan pagination dan response data atau error
+*/
+func (h *HosterHandler) GetListBookingsCustomerByBookingID(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GetListBookingsCustomerByBookingID: received request")
+	if r.Method != http.MethodGet {
+		response.BadRequest(w, message.MethodNotAllowed)
+		return
+	}
+
+	vars := mux.Vars(r)
+	bookingID := vars["bookingID"]
+	if bookingID == "" {
+		response.BadRequest(w, "booking ID is required")
+		return
+	}
+
+	// Parse query parameters for pagination
+	pageStr := r.URL.Query().Get("page")
+	limitStr := r.URL.Query().Get("limit")
+
+	page := 1
+	limit := 10
+
+	if pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	offset := (page - 1) * limit
+
+	ctx := r.Context()
+	bookings, err := h.service.GetListBookingsCustomerByBookingID(ctx, bookingID, limit, offset)
+	if err != nil {
+		log.Printf("GetListBookingsCustomerByBookingID: error getting bookings: %v", err)
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
+		return
+	}
+	log.Printf("GetListBookingsCustomerByBookingID: retrieved %d bookings for booking %s", len(bookings), bookingID)
+	response.OK(w, bookings, message.Success)
 }
 
 /*

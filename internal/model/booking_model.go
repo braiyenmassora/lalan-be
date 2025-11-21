@@ -120,3 +120,41 @@ type BookingListDTO struct {
 	ItemSummary    string `json:"item_summary" db:"item_summary"`
 	Quantity       int    `json:"quantity" db:"quantity"`
 }
+
+type BookingListCustomer struct {
+	BookingID      string `json:"booking_id" db:"booking_id"`
+	Code           string `json:"code" db:"code"`
+	CustomerID     string `json:"customer_id" db:"customer_id"`
+	CustomerName   string `json:"customer_name" db:"customer_name"`
+	StartDate      string `json:"start_date" db:"start_date"`
+	EndDate        string `json:"end_date" db:"end_date"`
+	DurationDays   int    `json:"duration_days" db:"duration_days"`
+	Total          int    `json:"total" db:"total"`
+	IdentityStatus string `json:"identity_status" db:"identity_status"`
+	ItemSummary    string `json:"item_summary" db:"item_summary"`
+	Quantity       int    `json:"quantity" db:"quantity"`
+}
+
+type BookingDetailCustomer struct {
+	BookingID      string `json:"booking_id" db:"booking_id"`
+	Code           string `json:"code" db:"code"`
+	CustomerID     string `json:"customer_id" db:"customer_id"`
+	CustomerName   string `json:"customer_name" db:"customer_name"`
+	CustomerEmail  string `json:"customer_email" db:"customer_email"`
+	CustomerPhone  string `json:"customer_phone" db:"customer_phone"`
+	StartDate      string `json:"start_date" db:"start_date"`
+	EndDate        string `json:"end_date" db:"end_date"`
+	DurationDays   int    `json:"duration_days" db:"duration_days"`
+	Total          int    `json:"total" db:"total"`
+	IdentityStatus string `json:"identity_status" db:"identity_status"` // indikator KTP
+	ItemSummary    string `json:"item_summary" db:"item_summary"`
+	Quantity       int    `json:"quantity" db:"quantity"`
+
+	// field tambahan yang bukan dari DB
+	Products      string `json:"products" db:"-"`
+	ItemCount     int    `json:"item_count" db:"-"`
+	TotalQuantity int    `json:"total_quantity" db:"-"`
+	DeliveryType  string `json:"delivery_type" db:"delivery_type"`
+	CustomerAddr  string `json:"customer_address" db:"customer_address"`
+	CustomerNotes string `json:"customer_notes" db:"customer_notes"`
+}
