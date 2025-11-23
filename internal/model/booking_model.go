@@ -183,14 +183,13 @@ type BookingDetailCustomer struct {
 }
 
 type BookingListDTOHoster struct {
-	BookingID      string `json:"booking_id" db:"booking_id"`           // ID Pesanan
-	CustomerName   string `json:"customer_name" db:"customer_name"`     // Penyewa
-	ItemSummary    string `json:"item_summary" db:"item_summary"`       // Ringkasan Barang
-	StartDate      string `json:"start_date" db:"start_date"`           // Tanggal Mulai
-	EndDate        string `json:"end_date" db:"end_date"`               // Tanggal Selesai
-	TotalDays      int    `json:"total_days" db:"total_days"`           // Lama Sewa
-	Total          int    `json:"total" db:"total"`                     // Total Pembayaran
-	IdentityStatus string `json:"identity_status" db:"identity_status"` // Status Identitas (approved/pending/rejected)
+	BookingID    string `json:"booking_id" db:"booking_id"`       // ID Pesanan
+	CustomerName string `json:"customer_name" db:"customer_name"` // Penyewa
+	ItemSummary  string `json:"item_summary" db:"item_summary"`   // Ringkasan Barang
+	StartDate    string `json:"start_date" db:"start_date"`       // Tanggal Mulai
+	EndDate      string `json:"end_date" db:"end_date"`           // Tanggal Selesai
+	Total        int    `json:"total" db:"total"`
+	Status       string `json:"status" db:"status"`
 }
 
 type BookingDetailDTOHoster struct {

@@ -804,17 +804,15 @@ SELECT
     b.id AS booking_id,
     bc.name AS customer_name,
     STRING_AGG(bi.name || ' x' || bi.quantity, ', ') AS item_summary,
-    b.start_date,
-    b.end_date,
-    b.total_days,
+    b.start_date::text AS start_date,
+    b.end_date::text AS end_date,
     b.total,
-    i.status AS identity_status
+    b.status
 FROM booking b
 JOIN booking_customer bc ON bc.booking_id = b.id
 JOIN booking_item bi ON bi.booking_id = b.id
-LEFT JOIN identity i ON i.id = b.identity_id
 WHERE b.hoster_id = $1
-GROUP BY b.id, bc.name, b.start_date, b.end_date, b.total_days, b.total, i.status
+GROUP BY b.id, bc.name, b.start_date, b.end_date, b.total, b.status
 ORDER BY b.start_date DESC
 LIMIT $2 OFFSET $3
 `
