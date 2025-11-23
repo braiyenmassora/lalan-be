@@ -47,6 +47,7 @@ type HosterService interface {
 	GetListBookingsCustomer(ctx context.Context, limit int, offset int) ([]model.BookingListDTOHoster, error)
 	GetListBookingsCustomerByBookingID(ctx context.Context, bookingID string, limit int, offset int) ([]model.BookingDetailDTOHoster, error)
 	GetListCustomer(ctx context.Context) ([]model.CustomerIdentityDTO, error)
+	GetDetailCustomer(ctx context.Context, customerID string) (*model.CustomerIdentityDetailDTO, error)
 }
 
 /*
@@ -542,6 +543,31 @@ func (s *hosterService) GetListCustomer(ctx context.Context) ([]model.CustomerId
 	}
 
 	return customers, nil
+}
+
+/*
+GetDetailCustomer
+mengambil detail customer berdasarkan customer ID dengan validasi hoster
+*/
+func (s *hosterService) GetDetailCustomer(ctx context.Context, customerID string) (*model.CustomerIdentityDetailDTO, error) {
+	hosterID, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		return nil, errors.New(message.Unauthorized)
+	}
+
+	if customerID == "" {
+		return nil, errors.New(fmt.Sprintf(message.Required, "customer ID"))
+	}
+
+	customer, err := s.repo.GetDetailCustomer(customerID, hosterID)
+	if err != nil {
+		return nil, errors.New(message.InternalError)
+	}
+	if customer == nil {
+		return nil, errors.New(fmt.Sprintf(message.NotFound, "customer"))
+	}
+
+	return customer, nil
 }
 
 /*
