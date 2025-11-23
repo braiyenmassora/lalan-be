@@ -278,9 +278,9 @@ func (r *customerRespository) GetIdentityByUserID(userID string) (*model.Identit
 
 /*
 CreateBooking
-menyisipkan booking baru dengan item, customer, dan identitas dalam transaksi
+menyisipkan booking baru dengan item dan customer dalam transaksi (tanpa booking_identity)
 */
-func (r *customerRespository) CreateBooking(booking *model.BookingModel, items []model.BookingItem, customer model.BookingCustomer, identity model.BookingIdentity) (*model.BookingDetailDTO, error) {
+func (r *customerRespository) CreateBooking(booking *model.BookingModel, items []model.BookingItem, customer model.BookingCustomer) (*model.BookingDetailDTO, error) { // Hapus parameter identity
 	tx, err := r.db.Beginx()
 	if err != nil {
 		log.Printf("CreateBooking: error starting transaction: %v", err)
@@ -298,12 +298,12 @@ func (r *customerRespository) CreateBooking(booking *model.BookingModel, items [
             start_date, end_date, total_days,
             delivery_type,
             rental, deposit, discount, total, outstanding,
-            user_id, identity_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            user_id, identity_id, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
     `
 	log.Printf("CreateBooking: executing query: %s", queryBooking)
 	_, err = tx.Exec(queryBooking, booking.ID, booking.Code, booking.HosterID, booking.LockedUntil, booking.StartDate, booking.EndDate, booking.TotalDays, booking.DeliveryType,
-		booking.Rental, booking.Deposit, booking.Discount, booking.Total, booking.Outstanding, booking.UserID, booking.IdentityID)
+		booking.Rental, booking.Deposit, booking.Discount, booking.Total, booking.Outstanding, booking.UserID, booking.IdentityID, booking.Status)
 	if err != nil {
 		log.Printf("CreateBooking: error inserting booking: %v", err)
 		return nil, err
@@ -344,23 +344,6 @@ func (r *customerRespository) CreateBooking(booking *model.BookingModel, items [
 		return nil, err
 	}
 
-	/*
-	  CreateBooking - Insert Identity
-	  menyisipkan data identitas ke dalam booking
-	*/
-	queryIdentity := `
-        INSERT INTO booking_identity (
-            id, booking_id, uploaded, status, reason,
-            reupload_allowed, estimated_time, status_check_url, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-    `
-	log.Printf("CreateBooking: inserting identity: %s, %s, %t, %s, %v, %t, %s, %s, %s, %s", identity.ID, identity.BookingID, identity.Uploaded, identity.Status, identity.Reason, identity.ReuploadAllowed, identity.EstimatedTime, identity.StatusCheckURL, identity.CreatedAt, identity.UpdatedAt)
-	_, err = tx.Exec(queryIdentity, identity.ID, identity.BookingID, identity.Uploaded, identity.Status, identity.Reason, identity.ReuploadAllowed, identity.EstimatedTime, identity.StatusCheckURL, identity.CreatedAt, identity.UpdatedAt)
-	if err != nil {
-		log.Printf("CreateBooking: error inserting identity: %v", err)
-		return nil, err
-	}
-
 	err = tx.Commit()
 	if err != nil {
 		log.Printf("CreateBooking: error committing transaction: %v", err)
@@ -384,23 +367,47 @@ mengambil daftar booking berdasarkan user ID
 */
 func (r *customerRespository) GetBookingsByUserID(userID string) ([]model.BookingListDTO, error) {
 	/*
-	  GetBookingsByUserID query
-	  mengambil daftar booking berdasarkan user ID
+	   GetBookingsByUserID query
+	   mengambil daftar booking berdasarkan user ID
 	*/
 	query := `
         SELECT 
-            b.code, 
+            b.id AS booking_id,
+            b.code,
+            b.hoster_id,
+            b.locked_until,
             b.start_date,
             b.end_date,
-            b.total, 
-            bid.status AS identity_status,
-            string_agg(bi.name, ', ') AS item_summary, 
-            sum(bi.quantity) AS quantity
+            b.total_days,
+            b.delivery_type,
+            b.rental,
+            b.deposit,
+            b.discount,
+            b.total,
+            b.outstanding,
+            b.user_id,
+            b.identity_id,
+            b.status,
+            b.created_at AS booking_created_at,
+            b.updated_at AS booking_updated_at,
+            bi.id AS booking_item_id,
+            bi.item_id,
+            bi.name AS item_name,
+            bi.quantity,
+            bi.price_per_day,
+            bi.deposit_per_unit,
+            bi.subtotal_rental,
+            bi.subtotal_deposit,
+            bc.id AS booking_customer_id,
+            bc.name AS customer_name,
+            bc.phone,
+            bc.email,
+            bc.address,
+            bc.notes
         FROM booking b
         LEFT JOIN booking_item bi ON b.id = bi.booking_id
-        LEFT JOIN booking_identity bid ON b.id = bid.booking_id
+        LEFT JOIN booking_customer bc ON b.id = bc.booking_id
         WHERE b.user_id = $1
-        GROUP BY b.id, b.code, b.start_date, b.end_date, b.total, bid.status
         ORDER BY b.created_at DESC
     `
 	var bookings []model.BookingListDTO
@@ -419,22 +426,46 @@ mengambil daftar semua booking dengan agregasi item
 */
 func (r *customerRespository) GetListBookings() ([]model.BookingListDTO, error) {
 	/*
-	  GetListBookings query
-	  mengambil daftar semua booking dengan agregasi item
+	   GetListBookings query
+	   mengambil daftar semua booking dengan agregasi item
 	*/
 	query := `
         SELECT 
-            b.code, 
+            b.id AS booking_id,
+            b.code,
+            b.hoster_id,
+            b.locked_until,
             b.start_date,
             b.end_date,
-            b.total, 
-            bid.status AS identity_status,
-            string_agg(bi.name, ', ') AS item_summary, 
-            sum(bi.quantity) AS quantity
+            b.total_days,
+            b.delivery_type,
+            b.rental,
+            b.deposit,
+            b.discount,
+            b.total,
+            b.outstanding,
+            b.user_id,
+            b.identity_id,
+            b.status,
+            b.created_at AS booking_created_at,
+            b.updated_at AS booking_updated_at,
+            bi.id AS booking_item_id,
+            bi.item_id,
+            bi.name AS item_name,
+            bi.quantity,
+            bi.price_per_day,
+            bi.deposit_per_unit,
+            bi.subtotal_rental,
+            bi.subtotal_deposit,
+            bc.id AS booking_customer_id,
+            bc.name AS customer_name,
+            bc.phone,
+            bc.email,
+            bc.address,
+            bc.notes
         FROM booking b
         LEFT JOIN booking_item bi ON b.id = bi.booking_id
-        LEFT JOIN booking_identity bid ON b.id = bid.booking_id
-        GROUP BY b.id, b.code, b.start_date, b.end_date, b.total, bid.status
+        LEFT JOIN booking_customer bc ON b.id = bc.booking_id
         ORDER BY b.created_at DESC
     `
 	var bookings []model.BookingListDTO
@@ -560,14 +591,14 @@ func (r *customerRespository) GetHosterIDByItemID(itemID string) (string, error)
 
 /*
 GetBookingDetail
-mengambil detail booking lengkap berdasarkan booking_id
+mengambil detail booking lengkap berdasarkan booking_id (dengan customer response)
 */
 func (r *customerRespository) GetBookingDetail(bookingID string) (*model.BookingDetailDTO, error) {
 	// Query booking
 	var booking model.BookingModel
 	queryBooking := `
         SELECT id, code, hoster_id, locked_until, start_date, end_date, total_days, delivery_type,
-               rental, deposit, discount, total, outstanding, user_id, identity_id,
+               rental, deposit, discount, total, outstanding, user_id, identity_id, status,
                created_at, updated_at
         FROM booking WHERE id = $1
     `
@@ -610,24 +641,65 @@ func (r *customerRespository) GetBookingDetail(bookingID string) (*model.Booking
 		return nil, err
 	}
 
-	// Query identity
-	var identity model.BookingIdentity
-	queryIdentity := `
-        SELECT id, booking_id, uploaded, status, reason, reupload_allowed,
-               estimated_time, status_check_url, created_at, updated_at
-        FROM booking_identity WHERE booking_id = $1
+	// Query user
+	var user model.CustomerModel
+	queryUser := `
+        SELECT id, full_name, phone_number, email, profile_photo, address, email_verified, created_at, updated_at
+        FROM customer WHERE id = $1
     `
-	err = r.db.Get(&identity, queryIdentity, bookingID)
+	err = r.db.Get(&user, queryUser, booking.UserID)
 	if err != nil {
+		log.Printf("GetBookingDetail: error querying user: %v", err)
+		return nil, err
+	}
+
+	// Query identity
+	var identity model.IdentityModel
+	queryIdentity := `
+        SELECT
+            id,
+            user_id,
+            ktp_url,
+            verified,
+            status,
+            reason,
+            verified_at,
+            created_at,
+            updated_at
+        FROM identity
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT 1
+    `
+	err = r.db.Get(&identity, queryIdentity, booking.UserID)
+	if err != nil && err != sql.ErrNoRows {
 		log.Printf("GetBookingDetail: error querying identity: %v", err)
 		return nil, err
 	}
 
+	// Build customer response
+	customerResponse := model.BookingCustomerResponse{
+		CustomerID:  user.ID,
+		FullName:    user.FullName,
+		Email:       user.Email,
+		PhoneNumber: user.PhoneNumber,
+		ID:          identity.ID,
+		UserID:      identity.UserID,
+		KTPURL:      identity.KTPURL,
+		Verified:    identity.Verified,
+		Status:      identity.Status,
+		Reason:      &identity.Reason,
+		VerifiedAt:  identity.VerifiedAt,
+		CreatedAt:   identity.CreatedAt,
+		UpdatedAt:   identity.UpdatedAt,
+	}
+
+	// Update BookingDetailDTO
 	dto := &model.BookingDetailDTO{
-		Booking:  booking,
-		Items:    items,
-		Customer: customer,
-		Identity: identity,
+		Booking:         booking,
+		BookingItem:     items,
+		BookingCustomer: customer,
+		Customer:        customerResponse,
 	}
 
 	log.Printf("GetBookingDetail: retrieved detail for booking %s", bookingID)
@@ -647,7 +719,7 @@ type CustomerRepository interface {
 	CreateIdentity(identity *model.IdentityModel) error
 	CheckIdentityExists(userID string) (bool, error)
 	GetIdentityByUserID(userID string) (*model.IdentityModel, error)
-	CreateBooking(booking *model.BookingModel, items []model.BookingItem, customer model.BookingCustomer, identity model.BookingIdentity) (*model.BookingDetailDTO, error)
+	CreateBooking(booking *model.BookingModel, items []model.BookingItem, customer model.BookingCustomer) (*model.BookingDetailDTO, error) // Hapus parameter identity
 	GetBookingsByUserID(userID string) ([]model.BookingListDTO, error)
 	GetListBookings() ([]model.BookingListDTO, error)
 	UpdateIdentity(identity *model.IdentityModel) error

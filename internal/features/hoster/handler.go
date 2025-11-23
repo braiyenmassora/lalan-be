@@ -667,6 +667,28 @@ func (h *HosterHandler) GetListBookingsCustomerByBookingID(w http.ResponseWriter
 }
 
 /*
+GetListCustomer
+mengambil daftar customer yang terkait dengan hoster berdasarkan konteks dan response data atau error
+*/
+func (h *HosterHandler) GetListCustomer(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GetListCustomer: received request")
+	if r.Method != http.MethodGet {
+		response.BadRequest(w, message.MethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+	customers, err := h.service.GetListCustomer(ctx)
+	if err != nil {
+		log.Printf("GetListCustomer: error getting customers: %v", err)
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
+		return
+	}
+	log.Printf("GetListCustomer: retrieved %d customers", len(customers))
+	response.OK(w, customers, message.Success)
+}
+
+/*
 NewHosterHandler
 membuat instance baru HosterHandler dengan service yang diberikan
 */
