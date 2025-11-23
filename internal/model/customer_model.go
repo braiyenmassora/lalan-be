@@ -22,6 +22,15 @@ CustomerIdentityDTO
 struct untuk data customer dengan identity
 */
 type CustomerIdentityDTO struct {
+	CustomerID  string `json:"customer_id" db:"customer_id"`
+	FullName    string `json:"full_name" db:"full_name"`
+	Email       string `json:"email" db:"email"`
+	PhoneNumber string `json:"phone_number" db:"phone_number"`
+	Verified    bool   `json:"verified" db:"verified"`
+	Status      string `json:"status" db:"status"`
+}
+
+type CustomerIdentityDetailDTO struct {
 	CustomerID  string `json:"customer_id" db:"customer_id"` // customer.id
 	FullName    string `json:"full_name" db:"full_name"`
 	Email       string `json:"email" db:"email"`

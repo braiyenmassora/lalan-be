@@ -912,14 +912,8 @@ func (r *hosterRespository) GetListCustomer(hosterID string) ([]model.CustomerId
             c.full_name,
             c.email,
             c.phone_number,
-            i.id AS identity_id,
-            i.ktp_url,
             i.verified,
-            i.status,
-            i.reason,
-            i.verified_at,
-            i.created_at AS identity_created_at,
-            i.updated_at AS identity_updated_at
+            i.status
         FROM customer c
         LEFT JOIN LATERAL (
             SELECT *
@@ -939,6 +933,53 @@ func (r *hosterRespository) GetListCustomer(hosterID string) ([]model.CustomerId
 	}
 	log.Printf("GetListCustomer: found %d customers for hoster %s", len(customers), hosterID)
 	return customers, nil
+}
+
+/*
+GetDetailCustomer
+mengambil detail customer berdasarkan customer ID dan hoster ID
+*/
+func (r *hosterRespository) GetDetailCustomer(customerID string, hosterID string) (*model.CustomerIdentityDetailDTO, error) {
+	/*
+	   GetDetailCustomer query
+	   mengambil detail customer dengan identity terbaru berdasarkan customer ID dan hoster ID
+	*/
+	query := `
+        SELECT
+            c.id AS customer_id,
+            c.full_name,
+            c.email,
+            c.phone_number,
+            i.id AS identity_id,
+            i.ktp_url,
+            i.verified,
+            i.status,
+            i.reason,
+            i.verified_at,
+            i.created_at AS identity_created_at,
+            i.updated_at AS identity_updated_at
+        FROM customer c
+        LEFT JOIN LATERAL (
+            SELECT *
+            FROM identity i
+            WHERE i.user_id = c.id
+            ORDER BY i.created_at DESC
+            LIMIT 1
+        ) i ON true
+        WHERE c.id = $1 AND c.id IN (SELECT DISTINCT user_id FROM booking WHERE hoster_id = $2)
+    `
+	var customer model.CustomerIdentityDetailDTO
+	err := r.db.Get(&customer, query, customerID, hosterID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("GetDetailCustomer: no customer found for id %s and hoster %s", customerID, hosterID)
+			return nil, nil
+		}
+		log.Printf("GetDetailCustomer: error for id %s and hoster %s: %v", customerID, hosterID, err)
+		return nil, err
+	}
+	log.Printf("GetDetailCustomer: found customer id %s for hoster %s", customerID, hosterID)
+	return &customer, nil
 }
 
 /*
@@ -968,6 +1009,7 @@ type HosterRepository interface {
 	GetListBookingsCustomer(userID string, limit int, offset int) ([]model.BookingListDTOHoster, error)
 	GetListBookingsCustomerByBookingID(hosterID string, bookingID string, limit int, offset int) ([]model.BookingDetailDTOHoster, error)
 	GetListCustomer(hosterID string) ([]model.CustomerIdentityDTO, error)
+	GetDetailCustomer(customerID string, hosterID string) (*model.CustomerIdentityDetailDTO, error)
 }
 
 /*

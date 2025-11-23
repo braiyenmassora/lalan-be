@@ -689,6 +689,40 @@ func (h *HosterHandler) GetListCustomer(w http.ResponseWriter, r *http.Request) 
 }
 
 /*
+GetDetailCustomer
+mengambil detail customer berdasarkan customer ID dan response data atau error
+*/
+func (h *HosterHandler) GetDetailCustomer(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GetDetailCustomer: received request")
+	if r.Method != http.MethodGet {
+		response.BadRequest(w, message.MethodNotAllowed)
+		return
+	}
+
+	vars := mux.Vars(r)
+	customerID := strings.TrimSpace(vars["customerID"])
+	if customerID == "" {
+		response.BadRequest(w, fmt.Sprintf(message.Required, "customer ID"))
+		return
+	}
+
+	ctx := r.Context()
+	customer, err := h.service.GetDetailCustomer(ctx, customerID)
+	if err != nil {
+		log.Printf("GetDetailCustomer: error getting customer: %v", err)
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
+		return
+	}
+	if customer == nil {
+		log.Printf("GetDetailCustomer: customer not found")
+		response.Error(w, http.StatusNotFound, fmt.Sprintf(message.NotFound, "customer"))
+		return
+	}
+	log.Printf("GetDetailCustomer: retrieved customer for ID %s", customerID)
+	response.OK(w, customer, message.Success)
+}
+
+/*
 NewHosterHandler
 membuat instance baru HosterHandler dengan service yang diberikan
 */
