@@ -44,6 +44,7 @@ type HosterService interface {
 	UpdateTermsAndConditions(ctx context.Context, id string, input *model.TermsAndConditionsModel) (*model.TermsAndConditionsModel, error)
 	DeleteTermsAndConditions(ctx context.Context, id string) error
 	GetIdentityCustomer(ctx context.Context, userID string) (*model.IdentityModel, error)
+	GetListBookingsForHoster(ctx context.Context, limit int, offset int) ([]model.BookingListDTOHoster, error)
 	GetListBookingsCustomer(ctx context.Context, limit int, offset int) ([]model.BookingListDTOHoster, error)
 	GetListBookingsCustomerByBookingID(ctx context.Context, bookingID string, limit int, offset int) ([]model.BookingDetailDTOHoster, error)
 	GetListCustomer(ctx context.Context) ([]model.CustomerIdentityDTO, error)
@@ -62,7 +63,6 @@ func NewHosterService(repo HosterRepository) HosterService {
 generateTokenHoster
 menghasilkan JWT token untuk hoster
 */
-// di hoster/service.go — ganti fungsi generateTokenHoster kamu
 func (s *hosterService) generateTokenHoster(userID string) (*HosterResponse, error) {
 	// Access Token — 15 menit
 	accessToken, err := s.generateJWT(userID, "hoster", 15*time.Minute)
@@ -86,7 +86,10 @@ func (s *hosterService) generateTokenHoster(userID string) (*HosterResponse, err
 	}, nil
 }
 
-// Helper generate JWT (pakai secret dari env)
+/*
+generateJWT
+helper generate JWT (pakai secret dari env)
+*/
 func (s *hosterService) generateJWT(userID, role string, expires time.Duration) (string, error) {
 	claims := jwt.MapClaims{
 		"sub":  userID,
@@ -173,6 +176,13 @@ func (s *hosterService) CreateItem(ctx context.Context, input *model.ItemModel) 
 
 	input.Name = strings.TrimSpace(input.Name)
 	// Handle Description sebagai []string: Trim setiap string di slice
+	// if len(input.Description) > 0 {
+	// 	trimmed := make([]string, len(input.Description))
+	// 	for i, desc := range input.Description {
+	// 		trimmed[i] = strings.TrimSpace(desc)
+	// 	}
+	// 	input.Description = trimmed
+	// }
 
 	if input.Name == "" {
 		return nil, errors.New(fmt.Sprintf(message.Required, "item name"))
@@ -267,6 +277,13 @@ func (s *hosterService) UpdateItem(ctx context.Context, id string, input *model.
 
 	input.Name = strings.TrimSpace(input.Name)
 	// Handle Description sebagai []string: Trim setiap string di slice
+	// if len(input.Description) > 0 {
+	// 	trimmed := make([]string, len(input.Description))
+	// 	for i, desc := range input.Description {
+	// 		trimmed[i] = strings.TrimSpace(desc)
+	// 	}
+	// 	input.Description = trimmed
+	// }
 
 	if input.Name == "" {
 		return nil, errors.New(fmt.Sprintf(message.Required, "item name"))
@@ -313,7 +330,7 @@ func (s *hosterService) DeleteItem(ctx context.Context, id string) error {
 		return errors.New(fmt.Sprintf(message.NotFound, "item"))
 	}
 	if existing.UserID != userID {
-		return errors.New(message.Unauthorized) // Diperbaiki: Hapus 'nil,' agar hanya return error
+		return errors.New(message.Unauthorized)
 	}
 
 	return s.repo.DeleteItem(id)
@@ -371,6 +388,10 @@ FindTermsAndConditionsByID
 mencari syarat dan ketentuan berdasarkan ID
 */
 func (s *hosterService) FindTermsAndConditionsByID(id string) (*model.TermsAndConditionsModel, error) {
+	if id == "" {
+		return nil, errors.New(fmt.Sprintf(message.Required, "terms and conditions ID"))
+	}
+
 	tac, err := s.repo.FindTermsAndConditionsByID(id)
 	if err != nil {
 		return nil, errors.New(message.InternalError)
@@ -443,7 +464,7 @@ func (s *hosterService) DeleteTermsAndConditions(ctx context.Context, id string)
 		return errors.New(fmt.Sprintf(message.NotFound, "terms and conditions"))
 	}
 	if existing.UserID != userID {
-		return errors.New(message.Unauthorized) // Diperbaiki: Hapus 'nil,' agar hanya return error
+		return errors.New(message.Unauthorized)
 	}
 
 	return s.repo.DeleteTermsAndConditions(id)

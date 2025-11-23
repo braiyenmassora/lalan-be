@@ -1,11 +1,10 @@
 -- Tabel utama booking dengan referensi ke hoster
 CREATE TABLE booking (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code VARCHAR NOT NULL,
     hoster_id UUID NOT NULL REFERENCES hoster(id),
     locked_until TIMESTAMP NOT NULL,
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
+    start_date VARCHAR NOT NULL,
+    end_date VARCHAR NOT NULL,
     total_days INTEGER NOT NULL,
     delivery_type VARCHAR NOT NULL,
     rental INTEGER NOT NULL,
