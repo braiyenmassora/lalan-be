@@ -44,8 +44,9 @@ type HosterService interface {
 	UpdateTermsAndConditions(ctx context.Context, id string, input *model.TermsAndConditionsModel) (*model.TermsAndConditionsModel, error)
 	DeleteTermsAndConditions(ctx context.Context, id string) error
 	GetIdentityCustomer(ctx context.Context, userID string) (*model.IdentityModel, error)
-	GetListBookingsCustomer(ctx context.Context, limit int, offset int) ([]model.BookingListCustomer, error)
-	GetListBookingsCustomerByBookingID(ctx context.Context, bookingID string, limit int, offset int) ([]model.BookingDetailCustomer, error)
+	GetListBookingsCustomer(ctx context.Context, limit int, offset int) ([]model.BookingListDTOHoster, error)
+	GetListBookingsCustomerByBookingID(ctx context.Context, bookingID string, limit int, offset int) ([]model.BookingDetailDTOHoster, error)
+	GetListCustomer(ctx context.Context) ([]model.CustomerIdentityDTO, error)
 }
 
 /*
@@ -311,7 +312,7 @@ func (s *hosterService) DeleteItem(ctx context.Context, id string) error {
 		return errors.New(fmt.Sprintf(message.NotFound, "item"))
 	}
 	if existing.UserID != userID {
-		return errors.New(message.Unauthorized)
+		return errors.New(message.Unauthorized) // Diperbaiki: Hapus 'nil,' agar hanya return error
 	}
 
 	return s.repo.DeleteItem(id)
@@ -441,7 +442,7 @@ func (s *hosterService) DeleteTermsAndConditions(ctx context.Context, id string)
 		return errors.New(fmt.Sprintf(message.NotFound, "terms and conditions"))
 	}
 	if existing.UserID != userID {
-		return errors.New(message.Unauthorized)
+		return errors.New(message.Unauthorized) // Diperbaiki: Hapus 'nil,' agar hanya return error
 	}
 
 	return s.repo.DeleteTermsAndConditions(id)
@@ -471,7 +472,7 @@ func (s *hosterService) GetIdentityCustomer(ctx context.Context, userID string) 
 GetListBookingsForHoster
 mengambil daftar booking yang dimiliki oleh hoster berdasarkan context dengan limit dan offset
 */
-func (s *hosterService) GetListBookingsForHoster(ctx context.Context, limit int, offset int) ([]model.BookingListCustomer, error) {
+func (s *hosterService) GetListBookingsForHoster(ctx context.Context, limit int, offset int) ([]model.BookingListDTOHoster, error) {
 	userID, ok := ctx.Value(middleware.UserIDKey).(string)
 	if !ok {
 		return nil, errors.New(message.Unauthorized)
@@ -489,7 +490,7 @@ func (s *hosterService) GetListBookingsForHoster(ctx context.Context, limit int,
 GetListBookingsCustomer
 mengambil daftar booking yang dimiliki oleh hoster berdasarkan context dengan limit dan offset
 */
-func (s *hosterService) GetListBookingsCustomer(ctx context.Context, limit int, offset int) ([]model.BookingListCustomer, error) {
+func (s *hosterService) GetListBookingsCustomer(ctx context.Context, limit int, offset int) ([]model.BookingListDTOHoster, error) {
 	userID, ok := ctx.Value(middleware.UserIDKey).(string)
 	if !ok {
 		return nil, errors.New(message.Unauthorized)
@@ -505,12 +506,16 @@ func (s *hosterService) GetListBookingsCustomer(ctx context.Context, limit int, 
 
 /*
 GetListBookingsCustomerByBookingID
-mengambil daftar booking yang dimiliki oleh hoster berdasarkan context dan booking ID dengan limit dan offset
+mengambil daftar booking yang dimiliki oleh hoster berdasarkan booking ID dengan limit dan offset
 */
-func (s *hosterService) GetListBookingsCustomerByBookingID(ctx context.Context, bookingID string, limit int, offset int) ([]model.BookingDetailCustomer, error) {
+func (s *hosterService) GetListBookingsCustomerByBookingID(ctx context.Context, bookingID string, limit int, offset int) ([]model.BookingDetailDTOHoster, error) {
 	hosterID, ok := ctx.Value(middleware.UserIDKey).(string)
 	if !ok {
 		return nil, errors.New(message.Unauthorized)
+	}
+
+	if bookingID == "" {
+		return nil, errors.New(fmt.Sprintf(message.Required, "booking ID"))
 	}
 
 	bookings, err := s.repo.GetListBookingsCustomerByBookingID(hosterID, bookingID, limit, offset)
@@ -522,8 +527,26 @@ func (s *hosterService) GetListBookingsCustomerByBookingID(ctx context.Context, 
 }
 
 /*
-type HosterResponse struct
-berisi data respons autentikasi hoster
+GetListCustomer
+mengambil daftar customer unik yang telah booking dengan hoster tertentu berdasarkan context
+*/
+func (s *hosterService) GetListCustomer(ctx context.Context) ([]model.CustomerIdentityDTO, error) {
+	hosterID, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		return nil, errors.New(message.Unauthorized)
+	}
+
+	customers, err := s.repo.GetListCustomer(hosterID)
+	if err != nil {
+		return nil, errors.New(message.InternalError)
+	}
+
+	return customers, nil
+}
+
+/*
+HosterResponse
+struct untuk response login hoster
 */
 type HosterResponse struct {
 	ID           string `json:"id"`

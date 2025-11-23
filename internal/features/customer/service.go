@@ -412,23 +412,10 @@ func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRe
 		return nil, errors.New(message.Unauthorized)
 	}
 
+	// Query identity to set IdentityID
 	identity, err := s.repo.GetIdentityByUserID(id)
 	if err != nil {
 		return nil, errors.New(message.InternalError)
-	}
-	if identity == nil {
-		return nil, errors.New("Anda belum mengunggah KTP. Silakan unggah KTP terlebih dahulu untuk melanjutkan pemesanan.")
-	}
-
-	// Validasi status identitas
-	if identity.Status == "pending" {
-		return nil, errors.New(message.IdentityPendingReview)
-	}
-	if identity.Status == "rejected" {
-		return nil, errors.New(fmt.Sprintf(message.IdentityRejected, identity.Reason))
-	}
-	if identity.Status != "approved" {
-		return nil, errors.New(message.Unauthorized)
 	}
 
 	start, _ := time.Parse("2006-01-02", req.StartDate)
@@ -463,9 +450,15 @@ func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRe
 		Total:                total,
 		Outstanding:          outstanding,
 		UserID:               id,
-		IdentityID:           &identity.ID,
+		IdentityID:           nil, // Will set below
+		Status:               "pending",
 		CreatedAt:            time.Now(),
 		UpdatedAt:            time.Now(),
+	}
+
+	// Set IdentityID if identity exists
+	if identity != nil {
+		booking.IdentityID = &identity.ID
 	}
 
 	// Set hoster_id from the first item if not set
@@ -503,20 +496,7 @@ func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRe
 		Notes:     req.Customer.Notes,
 	}
 
-	bookingIdentity := model.BookingIdentity{
-		ID:              uuid.New().String(),
-		BookingID:       bookingID,
-		Uploaded:        true,
-		Status:          identity.Status,
-		Reason:          &identity.Reason,
-		ReuploadAllowed: identity.Status == "rejected",
-		EstimatedTime:   "Maksimal 30 menit",
-		StatusCheckURL:  "/api/v1/admin/identity/" + id,
-		CreatedAt:       time.Now(),
-		UpdatedAt:       time.Now(),
-	}
-
-	detail, err := s.repo.CreateBooking(booking, items, customer, bookingIdentity)
+	detail, err := s.repo.CreateBooking(booking, items, customer)
 	if err != nil {
 		return nil, errors.New(message.InternalError)
 	}

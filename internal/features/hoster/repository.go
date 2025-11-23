@@ -707,6 +707,7 @@ func (r *hosterRespository) GetListBookingsForHoster(userID string, limit int, o
 	*/
 	query := `
 SELECT
+    b.id AS booking_id,
     b.code,
     b.user_id AS customer_id,
     bc.name AS customer_name,
@@ -714,12 +715,12 @@ SELECT
     b.end_date,
     b.total_days AS duration_days,
     b.total,
-    i.status AS identity_status,
+    COALESCE(i.status, '') AS identity_status,  // Ambil dari identity global
     COALESCE(bi.item_summary, '') AS item_summary,
     COALESCE(bi.quantity, 0) AS quantity
 FROM booking b
 LEFT JOIN booking_customer bc ON bc.booking_id = b.id
-LEFT JOIN booking_identity i ON i.booking_id = b.id
+LEFT JOIN identity i ON i.user_id = b.user_id  // Join identity berdasarkan user_id
 LEFT JOIN (
     SELECT booking_id, 
            string_agg(name || ' x' || quantity, ', ') AS item_summary,
@@ -753,6 +754,7 @@ func (r *hosterRespository) GetListBookingsForHosterByCustomerID(hosterID string
 	*/
 	query := `
 SELECT
+    b.id AS booking_id,
     b.code,
     b.user_id AS customer_id,
     bc.name AS customer_name,
@@ -760,12 +762,12 @@ SELECT
     b.end_date,
     b.total_days AS duration_days,
     b.total,
-    i.status AS identity_status,
+    COALESCE(i.status, '') AS identity_status,  // Ambil dari identity global
     COALESCE(bi.item_summary, '') AS item_summary,
     COALESCE(bi.quantity, 0) AS quantity
 FROM booking b
 LEFT JOIN booking_customer bc ON bc.booking_id = b.id
-LEFT JOIN booking_identity i ON i.booking_id = b.id
+LEFT JOIN identity i ON i.user_id = b.user_id  // Join identity berdasarkan user_id
 LEFT JOIN (
     SELECT booking_id, 
            string_agg(name || ' x' || quantity, ', ') AS item_summary,
@@ -792,7 +794,7 @@ LIMIT $3 OFFSET $4
 GetListBookingsCustomer
 mengambil daftar booking yang dimiliki oleh hoster berdasarkan user ID hoster dengan limit dan offset
 */
-func (r *hosterRespository) GetListBookingsCustomer(userID string, limit int, offset int) ([]model.BookingListCustomer, error) {
+func (r *hosterRespository) GetListBookingsCustomer(userID string, limit int, offset int) ([]model.BookingListDTOHoster, error) {
 	/*
 	   GetListBookingsCustomer query
 	   mengambil daftar booking dengan agregasi item untuk hoster tertentu
@@ -800,32 +802,24 @@ func (r *hosterRespository) GetListBookingsCustomer(userID string, limit int, of
 	query := `
 SELECT
     b.id AS booking_id,
-    b.code,
-    b.user_id AS customer_id,
     bc.name AS customer_name,
+    STRING_AGG(bi.name || ' x' || bi.quantity, ', ') AS item_summary,
     b.start_date,
     b.end_date,
-    b.total_days AS duration_days,
+    b.total_days,
     b.total,
-    i.status AS identity_status,
-    COALESCE(bi.item_summary, '') AS item_summary,
-    COALESCE(bi.quantity, 0) AS quantity
+    i.status AS identity_status
 FROM booking b
-LEFT JOIN booking_customer bc ON bc.booking_id = b.id
-LEFT JOIN booking_identity i ON i.booking_id = b.id
-LEFT JOIN (
-    SELECT booking_id, 
-           string_agg(name || ' x' || quantity, ', ') AS item_summary,
-           SUM(quantity) AS quantity
-    FROM booking_item
-    GROUP BY booking_id
-) bi ON bi.booking_id = b.id
+JOIN booking_customer bc ON bc.booking_id = b.id
+JOIN booking_item bi ON bi.booking_id = b.id
+LEFT JOIN identity i ON i.id = b.identity_id
 WHERE b.hoster_id = $1
-ORDER BY b.created_at DESC
+GROUP BY b.id, bc.name, b.start_date, b.end_date, b.total_days, b.total, i.status
+ORDER BY b.start_date DESC
 LIMIT $2 OFFSET $3
 `
 
-	var bookings []model.BookingListCustomer
+	var bookings []model.BookingListDTOHoster
 	err := r.db.Select(&bookings, query, userID, limit, offset)
 	if err != nil {
 		log.Printf("GetListBookingsCustomer: error: %v", err)
@@ -839,45 +833,61 @@ LIMIT $2 OFFSET $3
 GetListBookingsCustomerByBookingID
 mengambil daftar booking yang dimiliki oleh hoster berdasarkan hoster ID dan booking ID dengan limit dan offset
 */
-func (r *hosterRespository) GetListBookingsCustomerByBookingID(hosterID string, bookingID string, limit int, offset int) ([]model.BookingDetailCustomer, error) {
+func (r *hosterRespository) GetListBookingsCustomerByBookingID(hosterID string, bookingID string, limit int, offset int) ([]model.BookingDetailDTOHoster, error) {
 	/*
 	   GetListBookingsCustomerByBookingID query
-	   mengambil daftar booking dengan agregasi item untuk hoster tertentu dan booking tertentu
+	   mengambil daftar booking dengan detail item untuk hoster tertentu dan booking tertentu
 	*/
 	query := `
 SELECT
     b.id AS booking_id,
     b.code,
-    b.user_id AS customer_id,
-    bc.name AS customer_name,
-    bc.email AS customer_email,
-    bc.phone AS customer_phone,
+    b.hoster_id,
+    b.locked_until,
     b.start_date,
     b.end_date,
-    b.total_days AS duration_days,
-    b.total,
-    i.status AS identity_status,
-    COALESCE(bi.item_summary, '') AS item_summary,
-    COALESCE(bi.quantity, 0) AS quantity,
+    b.total_days,
     b.delivery_type,
-    bc.address AS customer_address,
-    bc.notes AS customer_notes
+    b.rental,
+    b.deposit,
+    b.discount,
+    b.total,
+    b.outstanding,
+    b.user_id,
+    b.identity_id,
+    b.status,
+    b.created_at AS booking_created_at,
+    b.updated_at AS booking_updated_at,
+
+    bi.id AS booking_item_id,
+    bi.item_id,
+    bi.name AS item_name,
+    bi.quantity,
+    bi.price_per_day,
+    bi.deposit_per_unit,
+    bi.subtotal_rental,
+    bi.subtotal_deposit,
+
+    bc.id AS booking_customer_id,
+    bc.name AS customer_name,
+    bc.phone,
+    bc.email,
+    bc.address,
+    bc.notes,
+
+    i.ktp_url,
+    i.status AS identity_status,
+    i.reason AS identity_reason
 FROM booking b
-LEFT JOIN booking_customer bc ON bc.booking_id = b.id
-LEFT JOIN booking_identity i ON i.booking_id = b.id
-LEFT JOIN (
-    SELECT booking_id, 
-           string_agg(name || ' x' || quantity, ', ') AS item_summary,
-           SUM(quantity) AS quantity
-    FROM booking_item
-    GROUP BY booking_id
-) bi ON bi.booking_id = b.id
+JOIN booking_item bi ON bi.booking_id = b.id
+JOIN booking_customer bc ON bc.booking_id = b.id
+LEFT JOIN identity i ON i.id = b.identity_id
 WHERE b.hoster_id = $1 AND b.id = $2
 ORDER BY b.created_at DESC
 LIMIT $3 OFFSET $4
 `
 
-	var bookings []model.BookingDetailCustomer
+	var bookings []model.BookingDetailDTOHoster
 	err := r.db.Select(&bookings, query, hosterID, bookingID, limit, offset)
 	if err != nil {
 		log.Printf("GetListBookingsCustomerByBookingID: error: %v", err)
@@ -887,7 +897,50 @@ LIMIT $3 OFFSET $4
 	return bookings, nil
 }
 
-// ...existing code...
+/*
+GetListCustomer
+mengambil daftar customer unik yang telah booking dengan hoster tertentu
+*/
+func (r *hosterRespository) GetListCustomer(hosterID string) ([]model.CustomerIdentityDTO, error) {
+	/*
+	   GetListCustomer query
+	   mengambil daftar customer dengan identity terbaru berdasarkan hoster ID
+	*/
+	query := `
+        SELECT
+            c.id AS customer_id,
+            c.full_name,
+            c.email,
+            c.phone_number,
+            i.id AS identity_id,
+            i.ktp_url,
+            i.verified,
+            i.status,
+            i.reason,
+            i.verified_at,
+            i.created_at AS identity_created_at,
+            i.updated_at AS identity_updated_at
+        FROM customer c
+        LEFT JOIN LATERAL (
+            SELECT *
+            FROM identity i
+            WHERE i.user_id = c.id
+            ORDER BY i.created_at DESC
+            LIMIT 1
+        ) i ON true
+        WHERE c.id IN (SELECT DISTINCT user_id FROM booking WHERE hoster_id = $1)
+        ORDER BY c.full_name
+    `
+	var customers []model.CustomerIdentityDTO
+	err := r.db.Select(&customers, query, hosterID)
+	if err != nil {
+		log.Printf("GetListCustomer: error: %v", err)
+		return nil, err
+	}
+	log.Printf("GetListCustomer: found %d customers for hoster %s", len(customers), hosterID)
+	return customers, nil
+}
+
 /*
 HosterRepository
 mendefinisikan kontrak untuk akses data hoster
@@ -912,8 +965,9 @@ type HosterRepository interface {
 	UpdateIdentityStatus(identityID string, status string, rejectedReason string, verified bool, verifiedAt *time.Time) error
 	UpdateBookingStatusByUserID(userID, status string) error
 	UpdateBookingIdentityStatusByUserID(userID, status string) error
-	GetListBookingsCustomer(userID string, limit int, offset int) ([]model.BookingListCustomer, error)
-	GetListBookingsCustomerByBookingID(hosterID string, bookingID string, limit int, offset int) ([]model.BookingDetailCustomer, error)
+	GetListBookingsCustomer(userID string, limit int, offset int) ([]model.BookingListDTOHoster, error)
+	GetListBookingsCustomerByBookingID(hosterID string, bookingID string, limit int, offset int) ([]model.BookingDetailDTOHoster, error)
+	GetListCustomer(hosterID string) ([]model.CustomerIdentityDTO, error)
 }
 
 /*
