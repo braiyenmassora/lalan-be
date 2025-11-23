@@ -435,9 +435,7 @@ func (h *CustomerHandler) CreateBooking(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		log.Printf("CreateBooking: error: %v", err)
 		errorMsg := err.Error()
-		if errorMsg == "Anda belum mengunggah KTP. Silakan unggah KTP terlebih dahulu untuk melanjutkan pemesanan." ||
-			errorMsg == "Identitas Anda sedang diverifikasi. Mohon tunggu proses selesai sebelum melakukan pemesanan." ||
-			errorMsg == "Identitas Anda ditolak. Silakan unggah ulang KTP yang valid untuk melanjutkan." {
+		if errorMsg == "silakan upload ktp terlebih dahulu" {
 			response.Error(w, http.StatusBadRequest, errorMsg)
 			return
 		}

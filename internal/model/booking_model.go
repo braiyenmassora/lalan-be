@@ -8,7 +8,6 @@ struct untuk data booking utama dengan field lengkap
 */
 type BookingModel struct {
 	ID                   string    `json:"id" db:"id"`
-	Code                 string    `json:"code" db:"code"`
 	HosterID             string    `json:"hoster_id" db:"hoster_id"`
 	LockedUntil          time.Time `json:"locked_until" db:"locked_until"`
 	TimeRemainingMinutes int       `json:"time_remaining_minutes" db:"-"`
@@ -77,22 +76,13 @@ type BookingIdentity struct {
 
 /*
 BookingCustomerResponse
-struct untuk response customer dalam booking detail dengan identity
+struct untuk response customer dalam booking detail
 */
 type BookingCustomerResponse struct {
-	CustomerID  string     `json:"customer_id"`
-	FullName    string     `json:"full_name"`
-	Email       string     `json:"email"`
-	PhoneNumber string     `json:"phone_number"`
-	ID          string     `json:"id"`
-	UserID      string     `json:"user_id"`
-	KTPURL      string     `json:"ktp_url"`
-	Verified    bool       `json:"verified"`
-	Status      string     `json:"status"`
-	Reason      *string    `json:"reason"`
-	VerifiedAt  *time.Time `json:"verified_at"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	CustomerID  string `json:"id"`
+	FullName    string `json:"full_name"`
+	Email       string `json:"email"`
+	PhoneNumber string `json:"phone_number"`
 }
 
 /*
@@ -101,9 +91,10 @@ struct untuk detail booking lengkap
 */
 type BookingDetailDTO struct {
 	Booking         BookingModel            `json:"booking"`
-	BookingItem     []BookingItem           `json:"items"`
+	Items           []BookingItem           `json:"items"`
 	BookingCustomer BookingCustomer         `json:"-"` // Not included in response
 	Customer        BookingCustomerResponse `json:"customer"`
+	Identity        IdentityModel           `json:"identity"`
 }
 
 /*
@@ -135,19 +126,16 @@ struct untuk list booking
 
 // for users
 type BookingListDTO struct {
-	BookingID   string `json:"booking_id" db:"booking_id"`
-	Code        string `json:"code" db:"code"`
-	StartDate   string `json:"start_date" db:"start_date"`
-	EndDate     string `json:"end_date" db:"end_date"`
-	Total       int    `json:"total" db:"total"`
-	Status      string `json:"status" db:"status"`
-	ItemSummary string `json:"item_summary" db:"item_summary"`
-	Quantity    int    `json:"quantity" db:"quantity"`
+	BookingID string `json:"booking_id" db:"booking_id"`
+	StartDate string `json:"start_date" db:"start_date"`
+	EndDate   string `json:"end_date" db:"end_date"`
+	TotalDays int    `json:"total_days" db:"total_days"`
+	Total     int    `json:"total" db:"total"`
+	Status    string `json:"status" db:"status"`
 }
 
 type BookingListCustomer struct {
 	BookingID      string `json:"booking_id" db:"booking_id"`
-	Code           string `json:"code" db:"code"`
 	CustomerID     string `json:"customer_id" db:"customer_id"`
 	CustomerName   string `json:"customer_name" db:"customer_name"`
 	StartDate      string `json:"start_date" db:"start_date"`
@@ -155,13 +143,11 @@ type BookingListCustomer struct {
 	DurationDays   int    `json:"duration_days" db:"duration_days"`
 	Total          int    `json:"total" db:"total"`
 	IdentityStatus string `json:"identity_status" db:"identity_status"`
-	ItemSummary    string `json:"item_summary" db:"item_summary"`
 	Quantity       int    `json:"quantity" db:"quantity"`
 }
 
 type BookingDetailCustomer struct {
 	BookingID      string `json:"booking_id" db:"booking_id"`
-	Code           string `json:"code" db:"code"`
 	CustomerID     string `json:"customer_id" db:"customer_id"`
 	CustomerName   string `json:"customer_name" db:"customer_name"`
 	CustomerEmail  string `json:"customer_email" db:"customer_email"`
@@ -171,7 +157,6 @@ type BookingDetailCustomer struct {
 	DurationDays   int    `json:"duration_days" db:"duration_days"`
 	Total          int    `json:"total" db:"total"`
 	IdentityStatus string `json:"identity_status" db:"identity_status"` // indikator KTP
-	ItemSummary    string `json:"item_summary" db:"item_summary"`
 	Quantity       int    `json:"quantity" db:"quantity"`
 
 	// field tambahan yang bukan dari DB
@@ -185,7 +170,6 @@ type BookingDetailCustomer struct {
 type BookingListDTOHoster struct {
 	BookingID    string `json:"booking_id" db:"booking_id"`       // ID Pesanan
 	CustomerName string `json:"customer_name" db:"customer_name"` // Penyewa
-	ItemSummary  string `json:"item_summary" db:"item_summary"`   // Ringkasan Barang
 	StartDate    string `json:"start_date" db:"start_date"`       // Tanggal Mulai
 	EndDate      string `json:"end_date" db:"end_date"`           // Tanggal Selesai
 	Total        int    `json:"total" db:"total"`
@@ -195,7 +179,6 @@ type BookingListDTOHoster struct {
 type BookingDetailDTOHoster struct {
 	// Booking
 	BookingID        string `json:"booking_id" db:"booking_id"`
-	Code             string `json:"code" db:"code"`
 	HosterID         string `json:"hoster_id" db:"hoster_id"`
 	LockedUntil      string `json:"locked_until" db:"locked_until"`
 	StartDate        string `json:"start_date" db:"start_date"`
@@ -235,7 +218,4 @@ type BookingDetailDTOHoster struct {
 	KTPURL         string `json:"ktp_url" db:"ktp_url"`
 	IdentityStatus string `json:"identity_status" db:"identity_status"`
 	IdentityReason string `json:"identity_reason" db:"identity_reason"`
-
-	// Optional summary
-	ItemSummary string `json:"item_summary" db:"item_summary"`
 }

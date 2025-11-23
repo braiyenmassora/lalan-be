@@ -54,7 +54,7 @@ func (r *customerRespository) CreateCustomer(customer *model.CustomerModel) erro
 		return err
 	}
 	log.Printf("CreateCustomer: inserted customer with email %s, ID %s", customer.Email, customer.ID)
-	return err
+	return nil
 }
 
 /*
@@ -159,8 +159,9 @@ func (r *customerRespository) UpdateCustomer(customer *model.CustomerModel) erro
 	_, err := r.db.Exec(query, customer.FullName, customer.PhoneNumber, customer.ProfilePhoto, customer.Address, customer.UpdatedAt, customer.ID)
 	if err != nil {
 		log.Printf("UpdateCustomer: error updating customer ID %s: %v", customer.ID, err)
+		return err
 	}
-	return err
+	return nil
 }
 
 /*
@@ -280,7 +281,18 @@ func (r *customerRespository) GetIdentityByUserID(userID string) (*model.Identit
 CreateBooking
 menyisipkan booking baru dengan item dan customer dalam transaksi (tanpa booking_identity)
 */
-func (r *customerRespository) CreateBooking(booking *model.BookingModel, items []model.BookingItem, customer model.BookingCustomer) (*model.BookingDetailDTO, error) { // Hapus parameter identity
+func (r *customerRespository) CreateBooking(booking *model.BookingModel, items []model.BookingItem, customer model.BookingCustomer) (*model.BookingDetailDTO, error) {
+	// Validasi: Periksa apakah customer sudah upload identitas
+	identity, err := r.GetIdentityByUserID(booking.UserID)
+	if err != nil {
+		log.Printf("CreateBooking: error checking identity for user %s: %v", booking.UserID, err)
+		return nil, err
+	}
+	if identity == nil {
+		log.Printf("CreateBooking: no identity found for user %s", booking.UserID)
+		return nil, fmt.Errorf("silakan upload ktp terlebih dahulu")
+	}
+
 	tx, err := r.db.Beginx()
 	if err != nil {
 		log.Printf("CreateBooking: error starting transaction: %v", err)
@@ -294,15 +306,15 @@ func (r *customerRespository) CreateBooking(booking *model.BookingModel, items [
 	*/
 	queryBooking := `
         INSERT INTO booking (
-            id, code, hoster_id, locked_until,
+            id, hoster_id, locked_until,
             start_date, end_date, total_days,
             delivery_type,
             rental, deposit, discount, total, outstanding,
             user_id, identity_id, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
     `
 	log.Printf("CreateBooking: executing query: %s", queryBooking)
-	_, err = tx.Exec(queryBooking, booking.ID, booking.Code, booking.HosterID, booking.LockedUntil, booking.StartDate, booking.EndDate, booking.TotalDays, booking.DeliveryType,
+	_, err = tx.Exec(queryBooking, booking.ID, booking.HosterID, booking.LockedUntil, booking.StartDate, booking.EndDate, booking.TotalDays, booking.DeliveryType,
 		booking.Rental, booking.Deposit, booking.Discount, booking.Total, booking.Outstanding, booking.UserID, booking.IdentityID, booking.Status)
 	if err != nil {
 		log.Printf("CreateBooking: error inserting booking: %v", err)
@@ -373,40 +385,12 @@ func (r *customerRespository) GetBookingsByUserID(userID string) ([]model.Bookin
 	query := `
         SELECT 
             b.id AS booking_id,
-            b.code,
-            b.hoster_id,
-            b.locked_until,
             b.start_date,
             b.end_date,
             b.total_days,
-            b.delivery_type,
-            b.rental,
-            b.deposit,
-            b.discount,
             b.total,
-            b.outstanding,
-            b.user_id,
-            b.identity_id,
-            b.status,
-            b.created_at AS booking_created_at,
-            b.updated_at AS booking_updated_at,
-            bi.id AS booking_item_id,
-            bi.item_id,
-            bi.name AS item_name,
-            bi.quantity,
-            bi.price_per_day,
-            bi.deposit_per_unit,
-            bi.subtotal_rental,
-            bi.subtotal_deposit,
-            bc.id AS booking_customer_id,
-            bc.name AS customer_name,
-            bc.phone,
-            bc.email,
-            bc.address,
-            bc.notes
+            b.status
         FROM booking b
-        LEFT JOIN booking_item bi ON b.id = bi.booking_id
-        LEFT JOIN booking_customer bc ON b.id = bc.booking_id
         WHERE b.user_id = $1
         ORDER BY b.created_at DESC
     `
@@ -432,40 +416,12 @@ func (r *customerRespository) GetListBookings() ([]model.BookingListDTO, error) 
 	query := `
         SELECT 
             b.id AS booking_id,
-            b.code,
-            b.hoster_id,
-            b.locked_until,
             b.start_date,
             b.end_date,
             b.total_days,
-            b.delivery_type,
-            b.rental,
-            b.deposit,
-            b.discount,
             b.total,
-            b.outstanding,
-            b.user_id,
-            b.identity_id,
-            b.status,
-            b.created_at AS booking_created_at,
-            b.updated_at AS booking_updated_at,
-            bi.id AS booking_item_id,
-            bi.item_id,
-            bi.name AS item_name,
-            bi.quantity,
-            bi.price_per_day,
-            bi.deposit_per_unit,
-            bi.subtotal_rental,
-            bi.subtotal_deposit,
-            bc.id AS booking_customer_id,
-            bc.name AS customer_name,
-            bc.phone,
-            bc.email,
-            bc.address,
-            bc.notes
+            b.status
         FROM booking b
-        LEFT JOIN booking_item bi ON b.id = bi.booking_id
-        LEFT JOIN booking_customer bc ON b.id = bc.booking_id
         ORDER BY b.created_at DESC
     `
 	var bookings []model.BookingListDTO
@@ -597,7 +553,7 @@ func (r *customerRespository) GetBookingDetail(bookingID string) (*model.Booking
 	// Query booking
 	var booking model.BookingModel
 	queryBooking := `
-        SELECT id, code, hoster_id, locked_until, start_date, end_date, total_days, delivery_type,
+        SELECT id, hoster_id, locked_until, start_date, end_date, total_days, delivery_type,
                rental, deposit, discount, total, outstanding, user_id, identity_id, status,
                created_at, updated_at
         FROM booking WHERE id = $1
@@ -630,26 +586,14 @@ func (r *customerRespository) GetBookingDetail(bookingID string) (*model.Booking
 	}
 
 	// Query customer
-	var customer model.BookingCustomer
+	var customer model.CustomerModel
 	queryCustomer := `
-        SELECT id, booking_id, name, phone, email, address, notes
-        FROM booking_customer WHERE booking_id = $1
-    `
-	err = r.db.Get(&customer, queryCustomer, bookingID)
-	if err != nil {
-		log.Printf("GetBookingDetail: error querying customer: %v", err)
-		return nil, err
-	}
-
-	// Query user
-	var user model.CustomerModel
-	queryUser := `
         SELECT id, full_name, phone_number, email, profile_photo, address, email_verified, created_at, updated_at
         FROM customer WHERE id = $1
     `
-	err = r.db.Get(&user, queryUser, booking.UserID)
+	err = r.db.Get(&customer, queryCustomer, booking.UserID)
 	if err != nil {
-		log.Printf("GetBookingDetail: error querying user: %v", err)
+		log.Printf("GetBookingDetail: error querying customer: %v", err)
 		return nil, err
 	}
 
@@ -679,27 +623,18 @@ func (r *customerRespository) GetBookingDetail(bookingID string) (*model.Booking
 
 	// Build customer response
 	customerResponse := model.BookingCustomerResponse{
-		CustomerID:  user.ID,
-		FullName:    user.FullName,
-		Email:       user.Email,
-		PhoneNumber: user.PhoneNumber,
-		ID:          identity.ID,
-		UserID:      identity.UserID,
-		KTPURL:      identity.KTPURL,
-		Verified:    identity.Verified,
-		Status:      identity.Status,
-		Reason:      &identity.Reason,
-		VerifiedAt:  identity.VerifiedAt,
-		CreatedAt:   identity.CreatedAt,
-		UpdatedAt:   identity.UpdatedAt,
+		CustomerID:  customer.ID,
+		FullName:    customer.FullName,
+		Email:       customer.Email,
+		PhoneNumber: customer.PhoneNumber,
 	}
 
 	// Update BookingDetailDTO
 	dto := &model.BookingDetailDTO{
-		Booking:         booking,
-		BookingItem:     items,
-		BookingCustomer: customer,
-		Customer:        customerResponse,
+		Booking:  booking,
+		Items:    items,
+		Customer: customerResponse,
+		Identity: identity,
 	}
 
 	log.Printf("GetBookingDetail: retrieved detail for booking %s", bookingID)

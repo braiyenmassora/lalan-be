@@ -36,12 +36,12 @@ type CustomerIdentityDetailDTO struct {
 	Email       string `json:"email" db:"email"`
 	PhoneNumber string `json:"phone_number" db:"phone_number"`
 
-	IdentityID string    `json:"identity_id" db:"identity_id"` // identity.id
-	KTPURL     string    `json:"ktp_url" db:"ktp_url"`
-	Verified   bool      `json:"verified" db:"verified"`
-	Status     string    `json:"status" db:"status"`
-	Reason     string    `json:"reason" db:"reason"`
-	VerifiedAt time.Time `json:"verified_at,omitempty" db:"verified_at"`
-	CreatedAt  time.Time `json:"created_at" db:"identity_created_at"`
-	UpdatedAt  time.Time `json:"updated_at" db:"identity_updated_at"`
+	IdentityID string     `json:"identity_id" db:"identity_id"` // identity.id
+	KTPURL     string     `json:"ktp_url" db:"ktp_url"`
+	Verified   bool       `json:"verified" db:"verified"`
+	Status     string     `json:"status" db:"status"`
+	Reason     string     `json:"reason" db:"reason"`
+	VerifiedAt *time.Time `json:"verified_at" db:"verified_at"`
+	CreatedAt  time.Time  `json:"created_at" db:"identity_created_at"`
+	UpdatedAt  time.Time  `json:"updated_at" db:"identity_updated_at"`
 }

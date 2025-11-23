@@ -4,15 +4,14 @@ Menyediakan struktur untuk menyimpan data KTP, status verifikasi, dan foreign ke
 */
 CREATE TABLE identity (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL,
-    ktp_url VARCHAR(255) NOT NULL,  -- URL atau path file KTP
-    verified BOOLEAN DEFAULT FALSE,
-    status VARCHAR(50) NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
-    rejected_reason TEXT,
-    verified_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    FOREIGN KEY (user_id) REFERENCES customer(id) ON DELETE CASCADE
+    user_id UUID NOT NULL REFERENCES customer(id) ON DELETE CASCADE,
+    ktp_url VARCHAR NOT NULL,
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
+    status VARCHAR NOT NULL DEFAULT 'pending',
+    reason TEXT,
+    verified_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 /*

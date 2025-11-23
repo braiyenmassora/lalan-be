@@ -431,13 +431,11 @@ func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRe
 	outstanding := total
 
 	bookingID := uuid.New().String()
-	code := "BK" + time.Now().Format("060102") + uuid.New().String()[:4]
 
 	lockedUntil := time.Now().Add(30 * time.Minute)
 
 	booking := &model.BookingModel{
 		ID:                   bookingID,
-		Code:                 code,
 		LockedUntil:          lockedUntil,
 		TimeRemainingMinutes: 0,
 		StartDate:            req.StartDate,
@@ -498,7 +496,7 @@ func (s *customerService) CreateBooking(ctx context.Context, req CreateBookingRe
 
 	detail, err := s.repo.CreateBooking(booking, items, customer)
 	if err != nil {
-		return nil, errors.New(message.InternalError)
+		return nil, err
 	}
 
 	return detail, nil
@@ -516,7 +514,7 @@ func (s *customerService) GetBookingsByUserID(ctx context.Context) ([]model.Book
 
 	bookings, err := s.repo.GetBookingsByUserID(id)
 	if err != nil {
-		return nil, errors.New(message.InternalError)
+		return nil, err
 	}
 
 	return bookings, nil
@@ -524,13 +522,19 @@ func (s *customerService) GetBookingsByUserID(ctx context.Context) ([]model.Book
 
 /*
 GetListBookings
-mengambil daftar semua booking
+mengambil daftar semua booking berdasarkan user yang sedang login
 */
 func (s *customerService) GetListBookings(ctx context.Context) ([]model.BookingListDTO, error) {
-	bookings, err := s.repo.GetListBookings()
-	if err != nil {
-		return nil, errors.New(message.InternalError)
+	id, ok := ctx.Value(middleware.UserIDKey).(string)
+	if !ok {
+		return nil, errors.New(message.Unauthorized)
 	}
+
+	bookings, err := s.repo.GetBookingsByUserID(id)
+	if err != nil {
+		return nil, err
+	}
+
 	return bookings, nil
 }
 

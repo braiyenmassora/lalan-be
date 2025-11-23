@@ -599,7 +599,7 @@ func (r *hosterRespository) GetIdentityCustomer(userID string) (*model.IdentityM
             ktp_url,
             verified,
             status,
-            rejected_reason,
+            reason,
             verified_at,
             created_at,
             updated_at
@@ -633,7 +633,7 @@ func (r *hosterRespository) UpdateIdentityStatus(identityID string, status strin
         UPDATE identity
         SET
             status = $1,
-            rejected_reason = $2,
+            reason = $2,
             verified = $3,
             verified_at = $4,
             updated_at = NOW()
@@ -708,7 +708,6 @@ func (r *hosterRespository) GetListBookingsForHoster(userID string, limit int, o
 	query := `
 SELECT
     b.id AS booking_id,
-    b.code,
     b.user_id AS customer_id,
     bc.name AS customer_name,
     b.start_date,
@@ -755,7 +754,6 @@ func (r *hosterRespository) GetListBookingsForHosterByCustomerID(hosterID string
 	query := `
 SELECT
     b.id AS booking_id,
-    b.code,
     b.user_id AS customer_id,
     bc.name AS customer_name,
     b.start_date,
@@ -791,6 +789,7 @@ LIMIT $3 OFFSET $4
 }
 
 /*
+*
 GetListBookingsCustomer
 mengambil daftar booking yang dimiliki oleh hoster berdasarkan user ID hoster dengan limit dan offset
 */
@@ -803,16 +802,13 @@ func (r *hosterRespository) GetListBookingsCustomer(userID string, limit int, of
 SELECT
     b.id AS booking_id,
     bc.name AS customer_name,
-    STRING_AGG(bi.name || ' x' || bi.quantity, ', ') AS item_summary,
     b.start_date::text AS start_date,
     b.end_date::text AS end_date,
     b.total,
     b.status
 FROM booking b
 JOIN booking_customer bc ON bc.booking_id = b.id
-JOIN booking_item bi ON bi.booking_id = b.id
 WHERE b.hoster_id = $1
-GROUP BY b.id, bc.name, b.start_date, b.end_date, b.total, b.status
 ORDER BY b.start_date DESC
 LIMIT $2 OFFSET $3
 `
@@ -828,18 +824,18 @@ LIMIT $2 OFFSET $3
 }
 
 /*
+*
 GetListBookingsCustomerByBookingID
 mengambil daftar booking yang dimiliki oleh hoster berdasarkan hoster ID dan booking ID dengan limit dan offset
 */
 func (r *hosterRespository) GetListBookingsCustomerByBookingID(hosterID string, bookingID string, limit int, offset int) ([]model.BookingDetailDTOHoster, error) {
-	/*
-	   GetListBookingsCustomerByBookingID query
-	   mengambil daftar booking dengan detail item untuk hoster tertentu dan booking tertentu
+	/**
+	  GetListBookingsCustomerByBookingID query
+	  mengambil daftar booking dengan detail item untuk hoster tertentu dan booking tertentu
 	*/
 	query := `
 SELECT
     b.id AS booking_id,
-    b.code,
     b.hoster_id,
     b.locked_until,
     b.start_date,
@@ -989,21 +985,23 @@ type HosterRepository interface {
 	FindByEmailHosterForLogin(email string) (*model.HosterModel, error)
 	GetDetailHoster(id string) (*model.HosterModel, error)
 	CreateItem(item *model.ItemModel) error
-	FindItemNameByUserID(name string, userId string) (*model.ItemModel, error)
 	FindItemNameByID(id string) (*model.ItemModel, error)
+	FindItemNameByUserID(name string, userId string) (*model.ItemModel, error)
 	GetAllItems() ([]*model.ItemModel, error)
 	UpdateItem(item *model.ItemModel) error
 	DeleteItem(id string) error
 	CreateTermsAndConditions(tac *model.TermsAndConditionsModel) error
-	FindTermsAndConditionsByID(name string) (*model.TermsAndConditionsModel, error)
+	FindTermsAndConditionsByID(id string) (*model.TermsAndConditionsModel, error)
+	FindTermsAndConditionsByUserIDAndDescription(userID string, description []string) (*model.TermsAndConditionsModel, error)
 	GetAllTermsAndConditions() ([]*model.TermsAndConditionsModel, error)
 	UpdateTermsAndConditions(tac *model.TermsAndConditionsModel) error
 	DeleteTermsAndConditions(id string) error
-	FindTermsAndConditionsByUserIDAndDescription(userID string, description []string) (*model.TermsAndConditionsModel, error)
 	GetIdentityCustomer(userID string) (*model.IdentityModel, error)
 	UpdateIdentityStatus(identityID string, status string, rejectedReason string, verified bool, verifiedAt *time.Time) error
 	UpdateBookingStatusByUserID(userID, status string) error
 	UpdateBookingIdentityStatusByUserID(userID, status string) error
+	GetListBookingsForHoster(userID string, limit int, offset int) ([]model.BookingListCustomer, error)
+	GetListBookingsForHosterByCustomerID(hosterID string, customerID string, limit int, offset int) ([]model.BookingListCustomer, error)
 	GetListBookingsCustomer(userID string, limit int, offset int) ([]model.BookingListDTOHoster, error)
 	GetListBookingsCustomerByBookingID(hosterID string, bookingID string, limit int, offset int) ([]model.BookingDetailDTOHoster, error)
 	GetListCustomer(hosterID string) ([]model.CustomerIdentityDTO, error)
