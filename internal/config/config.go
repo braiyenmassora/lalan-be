@@ -68,3 +68,43 @@ func DatabaseConfig() (*Config, error) {
 		SSLMode: ssl,
 	}, nil
 }
+
+/*
+GetStorageAccessKey
+mengambil access key untuk storage dari environment
+*/
+func GetStorageAccessKey() string {
+	return MustGetEnv("STORAGE_ACCESS_KEY")
+}
+
+/*
+GetStorageSecretKey
+mengambil secret key untuk storage dari environment
+*/
+func GetStorageSecretKey() string {
+	return MustGetEnv("STORAGE_SECRET_KEY")
+}
+
+/*
+GetStorageEndpoint
+mengambil endpoint untuk storage dari environment
+*/
+func GetStorageEndpoint() string {
+	return MustGetEnv("STORAGE_ENDPOINT")
+}
+
+/*
+GetStorageRegion
+mengambil region untuk storage dari environment
+*/
+func GetStorageRegion() string {
+	return MustGetEnv("STORAGE_REGION")
+}
+
+/*
+GetStorageBucket
+mengambil nama bucket untuk storage dari environment
+*/
+func GetStorageBucket() string {
+	return MustGetEnv("STORAGE_BUCKET")
+}
