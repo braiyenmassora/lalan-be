@@ -796,7 +796,7 @@ mengambil daftar booking yang dimiliki oleh hoster berdasarkan user ID hoster de
 func (r *hosterRespository) GetListBookingsCustomer(userID string, limit int, offset int) ([]model.BookingListDTOHoster, error) {
 	/*
 	   GetListBookingsCustomer query
-	   mengambil daftar booking dengan agregasi item untuk hoster tertentu
+	   mengambil daftar booking dengan agregasi item names dan total quantity untuk hoster tertentu
 	*/
 	query := `
 SELECT
@@ -805,10 +805,14 @@ SELECT
     b.start_date::text AS start_date,
     b.end_date::text AS end_date,
     b.total,
-    b.status
+    b.status,
+    COALESCE(string_agg(bi.name, ', '), '') AS item_names,
+    COALESCE(SUM(bi.quantity), 0) AS total_items
 FROM booking b
 JOIN booking_customer bc ON bc.booking_id = b.id
+LEFT JOIN booking_item bi ON bi.booking_id = b.id
 WHERE b.hoster_id = $1
+GROUP BY b.id, bc.name, b.start_date, b.end_date, b.total, b.status
 ORDER BY b.start_date DESC
 LIMIT $2 OFFSET $3
 `

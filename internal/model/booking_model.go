@@ -126,12 +126,13 @@ struct untuk list booking
 
 // for users
 type BookingListDTO struct {
-	BookingID string `json:"booking_id" db:"booking_id"`
-	StartDate string `json:"start_date" db:"start_date"`
-	EndDate   string `json:"end_date" db:"end_date"`
-	TotalDays int    `json:"total_days" db:"total_days"`
-	Total     int    `json:"total" db:"total"`
-	Status    string `json:"status" db:"status"`
+	BookingID  string    `json:"booking_id" db:"booking_id"`
+	StartDate  time.Time `json:"start_date" db:"start_date"`
+	EndDate    time.Time `json:"end_date" db:"end_date"`
+	Total      int       `json:"total" db:"total"` // Changed from float64 to int for consistency and precision
+	Status     string    `json:"status" db:"status"`
+	ItemNames  string    `json:"item_names" db:"item_names"`   // Nama item yang digabungkan dengan koma
+	TotalItems int       `json:"total_items" db:"total_items"` // Total quantity semua item
 }
 
 type BookingListCustomer struct {
@@ -174,6 +175,8 @@ type BookingListDTOHoster struct {
 	EndDate      string `json:"end_date" db:"end_date"`           // Tanggal Selesai
 	Total        int    `json:"total" db:"total"`
 	Status       string `json:"status" db:"status"`
+	ItemNames    string `json:"item_names" db:"item_names"`   // Nama item yang digabungkan dengan koma
+	TotalItems   int    `json:"total_items" db:"total_items"` // Total quantity semua item
 }
 
 type BookingDetailDTOHoster struct {

@@ -1,16 +1,26 @@
 package customer
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"path/filepath" // Tambahkan untuk filepath.Ext
 	"regexp"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gorilla/mux"
 
+	cfg "lalan-be/internal/config" // Rename import untuk menghindari konflik dengan aws config
 	"lalan-be/internal/message"
+	"lalan-be/internal/middleware"
 	"lalan-be/internal/model"
 	"lalan-be/internal/response"
 )
@@ -319,7 +329,25 @@ func (h *CustomerHandler) UploadIdentity(w http.ResponseWriter, r *http.Request)
 		response.BadRequest(w, fmt.Sprintf(message.InvalidFormat, "file type"))
 		return
 	}
-	ktpURL := "https://storage.example.com/ktp/" + header.Filename
+
+	// Validasi user_id dari context
+	userID := middleware.GetUserID(r)
+	if userID == "" {
+		log.Printf("UploadIdentity: user_id not found in context")
+		response.Error(w, http.StatusUnauthorized, message.Unauthorized)
+		return
+	}
+
+	// Upload ke Supabase Storage
+	ext := filepath.Ext(header.Filename)
+	filePath := fmt.Sprintf("ktp_%s%s", userID, ext)
+	ktpURL, err := uploadToSupabase(file, filePath)
+	if err != nil {
+		log.Printf("UploadIdentity: error uploading to Supabase: %v", err)
+		response.Error(w, http.StatusInternalServerError, "Upload failed")
+		return
+	}
+
 	ctx := r.Context()
 	err = h.service.UploadIdentity(ctx, ktpURL)
 	if err != nil {
@@ -337,6 +365,48 @@ func (h *CustomerHandler) UploadIdentity(w http.ResponseWriter, r *http.Request)
 	}
 	log.Printf("UploadIdentity: identity uploaded successfully")
 	response.OK(w, nil, message.IdentitySubmitted)
+}
+
+// Fungsi helper untuk upload ke Supabase Storage (S3-compatible)
+func uploadToSupabase(file io.Reader, filePath string) (string, error) {
+	cfgAWS, err := config.LoadDefaultConfig(context.TODO(),
+		config.WithRegion(cfg.GetStorageRegion()), // Gunakan cfg untuk package config
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+			cfg.GetStorageAccessKey(), // Gunakan cfg
+			cfg.GetStorageSecretKey(), // Gunakan cfg
+			"",
+		)),
+		config.WithEndpointResolver(aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+			return aws.Endpoint{
+				URL: cfg.GetStorageEndpoint(), // Gunakan cfg
+			}, nil
+		})),
+	)
+	if err != nil {
+		log.Printf("uploadToSupabase: failed to load AWS config: %v", err)
+		return "", fmt.Errorf("failed to load AWS config: %v", err)
+	}
+
+	client := s3.NewFromConfig(cfgAWS, func(o *s3.Options) {
+		o.UsePathStyle = true // Force path-style URL untuk Supabase
+	})
+	uploader := manager.NewUploader(client)
+
+	_, err = uploader.Upload(context.TODO(), &s3.PutObjectInput{ // Ganti result dengan _ karena tidak digunakan
+		Bucket: aws.String(cfg.GetStorageBucket()), // Gunakan cfg
+		Key:    aws.String(filePath),
+		Body:   file,
+		ACL:    "public-read", // Jika bucket public; ganti jika private
+	})
+	if err != nil {
+		log.Printf("uploadToSupabase: failed to upload file %s: %v", filePath, err)
+		return "", fmt.Errorf("failed to upload: %v", err)
+	}
+
+	// URL public: https://<project>.storage.supabase.co/storage/v1/object/public/<bucket>/<filePath>
+	publicURL := fmt.Sprintf("https://ayqriwhyjhkpxrsaszer.storage.supabase.co/storage/v1/object/public/%s/%s", cfg.GetStorageBucket(), filePath) // Gunakan cfg
+	log.Printf("uploadToSupabase: successfully uploaded file %s to %s", filePath, publicURL)
+	return publicURL, nil
 }
 
 /*
@@ -367,7 +437,23 @@ func (h *CustomerHandler) UpdateIdentity(w http.ResponseWriter, r *http.Request)
 		response.BadRequest(w, fmt.Sprintf(message.InvalidFormat, "file type"))
 		return
 	}
-	ktpURL := "https://storage.example.com/ktp/" + header.Filename
+
+	// Upload ke Supabase Storage
+	userID := middleware.GetUserID(r)
+	if userID == "" {
+		log.Printf("UpdateIdentity: user_id not found in context")
+		response.Error(w, http.StatusUnauthorized, message.Unauthorized)
+		return
+	}
+	ext := filepath.Ext(header.Filename)
+	filePath := fmt.Sprintf("ktp_%s%s", userID, ext)
+	ktpURL, err := uploadToSupabase(file, filePath)
+	if err != nil {
+		log.Printf("UpdateIdentity: error uploading to Supabase: %v", err)
+		response.Error(w, http.StatusInternalServerError, "Upload failed")
+		return
+	}
+
 	ctx := r.Context()
 	err = h.service.UpdateIdentity(ctx, ktpURL)
 	if err != nil {
@@ -466,8 +552,13 @@ func (h *CustomerHandler) GetBookingsByUserID(w http.ResponseWriter, r *http.Req
 		}
 		return
 	}
-	log.Printf("GetBookingsByUserID: retrieved %d bookings", len(bookings))
-	response.OK(w, bookings, message.Success)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    200,
+		"data":    bookings, // Menggunakan json tags pada BookingListDTO
+		"message": message.Success,
+		"success": true,
+	})
 }
 
 /*
@@ -488,7 +579,28 @@ func (h *CustomerHandler) GetListBookings(w http.ResponseWriter, r *http.Request
 		return
 	}
 	log.Printf("GetListBookings: retrieved %d bookings", len(bookings))
-	response.OK(w, bookings, message.Success)
+
+	// Debugging tambahan: log isi bookings
+	for i, b := range bookings {
+		log.Printf("Booking %d: %+v", i, b) // Print struct untuk cek isi
+	}
+
+	// Tambahkan debugging untuk cek JSON output dengan indent
+	jsonData, err := json.MarshalIndent(bookings, "", "  ")
+	if err != nil {
+		log.Printf("GetListBookings: error marshaling JSON: %v", err)
+	} else {
+		log.Println("Debug JSON output for GetListBookings:", string(jsonData)) // Harus snake_case jika tag benar
+	}
+
+	// Gunakan json.NewEncoder seperti GetBookingsByUserID untuk konsistensi
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    200,
+		"data":    bookings, // Menggunakan json tags pada BookingListDTO
+		"message": message.Success,
+		"success": true,
+	})
 }
 
 /*

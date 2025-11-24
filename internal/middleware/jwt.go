@@ -95,9 +95,11 @@ func JWTMiddleware(next http.Handler) http.Handler {
 
 		log.Printf("JWTMiddleware: Token valid, userID: %s, role: %s", claims.Subject, claims.Role)
 		log.Printf("JWTMiddleware: exp=%v (unix), now=%v", claims.ExpiresAt.Unix(), time.Now().Unix())
+		log.Printf("JWTMiddleware: setting user_id to context: %s", claims.Subject)
 		ctx := context.WithValue(r.Context(), UserIDKey, claims.Subject)
 		ctx = context.WithValue(ctx, UserRoleKey, claims.Role)
 		r = r.WithContext(ctx)
+		log.Printf("JWTMiddleware: context updated, calling next handler")
 
 		next.ServeHTTP(w, r)
 	})

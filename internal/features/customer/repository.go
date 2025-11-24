@@ -380,18 +380,21 @@ mengambil daftar booking berdasarkan user ID
 func (r *customerRespository) GetBookingsByUserID(userID string) ([]model.BookingListDTO, error) {
 	/*
 	   GetBookingsByUserID query
-	   mengambil daftar booking berdasarkan user ID
+	   mengambil daftar booking berdasarkan user ID dengan agregasi item names dan total quantity
 	*/
 	query := `
         SELECT 
             b.id AS booking_id,
-            b.start_date,
-            b.end_date,
-            b.total_days,
+            b.start_date::timestamptz AS start_date,
+            b.end_date::timestamptz AS end_date,
             b.total,
-            b.status
+            b.status,
+            COALESCE(string_agg(bi.name, ', '), '') AS item_names,
+            COALESCE(SUM(bi.quantity), 0) AS total_items
         FROM booking b
+        LEFT JOIN booking_item bi ON b.id = bi.booking_id
         WHERE b.user_id = $1
+        GROUP BY b.id, b.start_date, b.end_date, b.total, b.status
         ORDER BY b.created_at DESC
     `
 	var bookings []model.BookingListDTO
@@ -411,17 +414,20 @@ mengambil daftar semua booking dengan agregasi item
 func (r *customerRespository) GetListBookings() ([]model.BookingListDTO, error) {
 	/*
 	   GetListBookings query
-	   mengambil daftar semua booking dengan agregasi item
+	   mengambil daftar semua booking dengan agregasi item names dan total quantity
 	*/
 	query := `
         SELECT 
             b.id AS booking_id,
-            b.start_date,
-            b.end_date,
-            b.total_days,
+            b.start_date::timestamptz AS start_date,
+            b.end_date::timestamptz AS end_date,
             b.total,
-            b.status
+            b.status,
+            COALESCE(string_agg(bi.name, ', '), '') AS item_names,
+            COALESCE(SUM(bi.quantity), 0) AS total_items
         FROM booking b
+        LEFT JOIN booking_item bi ON b.id = bi.booking_id
+        GROUP BY b.id, b.start_date, b.end_date, b.total, b.status
         ORDER BY b.created_at DESC
     `
 	var bookings []model.BookingListDTO
