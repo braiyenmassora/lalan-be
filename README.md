@@ -77,7 +77,7 @@ lalan-be/
 
 ## Run Locally
 
-### Install Air (Live Reload)
+### Install Air
 
 ```bash
 go install github.com/air-verse/air@latest
