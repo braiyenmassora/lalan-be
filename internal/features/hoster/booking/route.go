@@ -2,6 +2,7 @@ package booking
 
 import (
 	"lalan-be/internal/middleware"
+	"net/http"
 
 	"github.com/gorilla/mux"
 )
@@ -22,10 +23,19 @@ Output:
 func SetupBookingRoutes(router *mux.Router, h *BookingHandler) {
 	protected := router.PathPrefix("/api/v1/hoster").Subrouter()
 
+	// JWT + Role check
 	protected.Use(middleware.JWTMiddleware)
 	protected.Use(middleware.Hoster)
 
+	// Route normal
 	protected.HandleFunc("/booking", h.GetListBookings).Methods("GET")
 	protected.HandleFunc("/booking/{id}", h.GetDetailBooking).Methods("GET")
 	protected.HandleFunc("/customer", h.GetCustomerList).Methods("GET")
+
+	// Tambahan ini yang paling penting: tangkap SEMUA OPTIONS di dalam subrouter ini
+	protected.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// CORS middleware sudah jalan duluan (di main router), jadi header sudah ada
+		// Kita cukup balas 204 supaya tidak 404
+		w.WriteHeader(http.StatusNoContent)
+	})
 }
