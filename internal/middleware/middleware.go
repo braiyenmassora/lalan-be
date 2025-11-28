@@ -52,13 +52,36 @@ Output:
 func CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		env := config.GetEnv("APP_ENV", "dev")
-		origin := config.GetEnv("ALLOWED_ORIGIN", "*")
+		var allowedCfg string
 
-		if env == "production" && origin == "*" {
-			log.Println("WARNING: ALLOWED_ORIGIN not set in production, using wildcard (*)")
+		if env == "dev" {
+			allowedCfg = config.GetEnv("ALLOWED_ORIGIN_DEV", "*")
+		} else {
+			allowedCfg = config.GetEnv("ALLOWED_ORIGIN_STAGING", "https://lalan-fe.vercel.app")
 		}
 
-		w.Header().Set("Access-Control-Allow-Origin", origin)
+		reqOrigin := r.Header.Get("Origin")
+		allowed := "*"
+
+		if env == "production" {
+			// hanya izinkan origin yang match exact
+			if reqOrigin == allowedCfg {
+				allowed = reqOrigin
+			} else {
+				allowed = "" // tolak
+			}
+		} else {
+			// dev/staging → mirror origin agar cocok dgn credentials
+			if reqOrigin != "" {
+				allowed = reqOrigin
+			}
+		}
+
+		if allowed != "" {
+			w.Header().Set("Access-Control-Allow-Origin", allowed)
+			w.Header().Set("Vary", "Origin")
+		}
+
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
