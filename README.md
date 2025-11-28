@@ -2,7 +2,7 @@
 
 API for managing outdoor rental operations used by admin, hoster, and customer.
 
-## Summary
+## Tech Stack
 
 | Field            | Value                                              |
 |------------------|----------------------------------------------------|
@@ -11,7 +11,7 @@ API for managing outdoor rental operations used by admin, hoster, and customer.
 | Storage Bucket   | Supabase Bucket                                    |
 | Payment Gateway  | Xendit                                             |
 
-## Quick Start
+## Getting Started
 
 Clone the project:
 
