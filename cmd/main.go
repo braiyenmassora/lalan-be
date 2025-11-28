@@ -10,95 +10,109 @@ import (
 	"time"
 
 	"lalan-be/internal/config"
-	"lalan-be/internal/features/admin"
-	"lalan-be/internal/features/customer"
-	"lalan-be/internal/features/hoster"
-	"lalan-be/internal/features/public"
+	adminidentity "lalan-be/internal/features/admin/identity"
+	auth "lalan-be/internal/features/auth"
+	booking "lalan-be/internal/features/customer/booking"
+	custidentity "lalan-be/internal/features/customer/identity"
+	hosterbooking "lalan-be/internal/features/hoster/booking"
+	public "lalan-be/internal/features/public"
 	"lalan-be/internal/middleware"
+	"lalan-be/internal/utils"
 
 	"github.com/gorilla/mux"
 )
 
-/*
-main
-entry point aplikasi yang menginisialisasi semua komponen dan menjalankan server dengan graceful shutdown
-*/
 func main() {
+	log.Println("Starting Lalan Backend API...")
 
-	/*
-		LoadEnv & InitRedis
-		memuat environment dan menginisialisasi koneksi Redis
-	*/
+	// 1. Load environment variables
 	config.LoadEnv()
-	config.InitRedis()
+	port := config.GetEnv("APP_PORT", "8080")
+	log.Printf("Running in %s mode on port %s", config.GetEnv("APP_ENV", "dev"), port)
 
-	/*
-		DatabaseConfig
-		membuat koneksi ke PostgreSQL
-	*/
-	cfg, err := config.DatabaseConfig()
+	// 2. Inisialisasi database
+	dbCfg, err := config.InitDatabase()
 	if err != nil {
-		log.Fatalf("DB connection failed: %v", err)
+		log.Fatalf("Database connection failed: %v", err)
 	}
-	defer cfg.DB.Close()
+	defer dbCfg.DB.Close()
 
-	/*
-		Handler
-		membuat semua handler dengan service dan repository
-	*/
-	AdminHandler := admin.NewAdminHandler(admin.NewAdminService(admin.NewAdminRepository(cfg.DB)))
-	HosterHandler := hoster.NewHosterHandler(hoster.NewHosterService(hoster.NewHosterRepository(cfg.DB)))
-	CustomerHandler := customer.NewCustomerHandler(customer.NewCustomerService(customer.NewCustomerRepository(cfg.DB)))
-	PublicHandler := public.NewPublicHandler(public.NewPublicService(public.NewPublicRepository(cfg.DB)))
+	// 3. Inisialisasi Redis (opsional)
+	if err := config.InitRedis(); err != nil {
+		log.Printf("Redis not available: %v (continuing without cache)", err)
+	} else {
+		defer config.CloseRedis()
+	}
 
-	/*
-		Router
-		membuat router dan menambahkan middleware CORS
-	*/
-	r := mux.NewRouter()
-	r.Use(middleware.CORSMiddleware)
+	// 4. Inisialisasi storage
+	storage := utils.NewSupabaseStorageFromEnv()
 
-	/*
-		SetupRoutes
-		mendaftarkan semua route dari setiap fitur
-	*/
-	admin.SetupAdminRoutes(r, AdminHandler)
-	hoster.SetupHosterRoutes(r, HosterHandler)
-	customer.SetupCustomerRoutes(r, CustomerHandler)
-	public.SetupPublicRoutes(r, PublicHandler)
+	// 5. Inisialisasi handler dengan dependency injection
+	pubHandler := public.NewPublicHandler(public.NewPublicService(public.NewPublicRepository(dbCfg.DB)))
+	authHandler := auth.NewAuthHandler(auth.NewAuthService(auth.NewAuthRepository(dbCfg.DB)))
+	bookingHandler := booking.NewBookingHandler(booking.NewBookingService(booking.NewBookingRepository(dbCfg.DB)))
+	hosterHandler := hosterbooking.NewBookingHandler(hosterbooking.NewBookingService(hosterbooking.NewHosterBookingRepository(dbCfg.DB)))
+	customerIdentityHandler := custidentity.NewIdentityHandler(
+		custidentity.NewIdentityService(custidentity.NewIdentityRepository(dbCfg.DB), storage),
+	)
+	adminIdentityHandler := adminidentity.NewAdminIdentityHandler(
+		adminidentity.NewAdminIdentityService(adminidentity.NewAdminIdentityRepository(dbCfg.DB)),
+	)
 
-	/*
-		http.Server
-		menjalankan server di port 8080
-	*/
+	// 6. Setup router & routes
+	router := mux.NewRouter()
+	router.Use(middleware.CORSMiddleware)
+	router.HandleFunc("/health", healthCheck).Methods("GET")
+
+	public.SetupPublicRoutes(router, pubHandler)
+	auth.SetupAuthRoutes(router, authHandler)
+	booking.SetupBookingRoutes(router, bookingHandler)
+	hosterbooking.SetupBookingRoutes(router, hosterHandler)
+	custidentity.SetupIdentityRoutes(router, customerIdentityHandler)
+	adminidentity.SetupAdminIdentityRoutes(router, adminIdentityHandler)
+
+	// 7. Konfigurasi HTTP server dengan timeout aman
 	srv := &http.Server{
-		Addr:    ":8080",
-		Handler: r,
+		Addr:         ":" + port,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-
+	// 8. Jalankan server di background
 	go func() {
-		log.Println("Server running at http://localhost:8080")
+		log.Printf("Server listening at http://localhost:%s", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server crashed: %v", err)
 		}
 	}()
 
-	<-stop
+	// 9. Tunggu sinyal shutdown (Ctrl+C / SIGTERM)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
 	log.Println("Shutting down server...")
 
-	/*
-		Graceful Shutdown
-		menghentikan server dengan timeout 30 detik
-	*/
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// 10. Graceful shutdown dengan timeout 10 detik
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		log.Printf("Server forced to shutdown: %v", err)
+	} else {
+		log.Println("Server stopped gracefully")
 	}
+}
 
-	log.Println("Server stopped gracefully")
+/*
+healthCheck adalah endpoint monitoring sederhana.
+
+Output:
+- 200 OK + JSON {"status":"healthy",...}
+*/
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"healthy","service":"lalan-backend-api"}`))
 }

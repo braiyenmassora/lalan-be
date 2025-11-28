@@ -38,7 +38,7 @@ const (
 	OTPAlreadyVerified  = "email already verified"
 
 	// BOOKING RELATED
-	BookingCreated          = "booking created"
+	BookingCreated          = "booking has been created"
 	BookingConfirmed        = "booking confirmed"
 	BookingCancelled        = "booking cancelled"
 	BookingAlreadyConfirmed = "booking already confirmed"
