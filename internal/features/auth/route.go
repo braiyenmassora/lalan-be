@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"net/http"
+
 	"github.com/gorilla/mux"
 )
 
@@ -22,9 +24,14 @@ Output:
 func SetupAuthRoutes(router *mux.Router, h *AuthHandler) {
 	auth := router.PathPrefix("/api/v1/auth").Subrouter()
 
-	// Centralized login for admin / hoster / customer
-	auth.HandleFunc("/login", h.Login).Methods("POST")
-	auth.HandleFunc("/register", h.Register).Methods("POST")
-	auth.HandleFunc("/verify-otp", h.VerifyEmail).Methods("POST")
-	auth.HandleFunc("/resend-otp", h.ResendOTP).Methods("POST")
+	// PUBLIC ROUTES — tambahkan OPTIONS di semua endpoint yang dipanggil dari browser
+	auth.HandleFunc("/login", h.Login).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/register", h.Register).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/verify-otp", h.VerifyEmail).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/resend-otp", h.ResendOTP).Methods("POST", "OPTIONS")
+
+	// Opsional: handler khusus OPTIONS biar return 204 (lebih bersih)
+	auth.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
 }
