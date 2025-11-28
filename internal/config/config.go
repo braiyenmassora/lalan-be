@@ -12,24 +12,50 @@ import (
 )
 
 /*
-Config
-menyimpan koneksi database dan parameter konfigurasi PostgreSQL
+DBConfig menyimpan koneksi database dan detail kredensial.
+Digunakan oleh repository layer untuk berinteraksi dengan PostgreSQL.
 */
-type Config struct {
+type DBConfig struct {
 	DB      *sqlx.DB
 	User    string
 	Pass    string
 	Host    string
 	Port    string
-	DBName  string
+	Name    string
 	SSLMode string
 }
 
 /*
-DatabaseConfig
-membuat koneksi ke PostgreSQL menggunakan variabel environment dan mengembalikan konfigurasi database
+StorageConfig berisi semua konfigurasi untuk Supabase Storage (S3-compatible).
+Digunakan oleh utils.Storage untuk upload, delete, dan presigned URL.
 */
-func DatabaseConfig() (*Config, error) {
+type StorageConfig struct {
+	AccessKey string
+	SecretKey string
+	Endpoint  string
+	Region    string
+	Bucket    string
+	ProjectID string
+	Domain    string
+}
+
+/*
+InitDatabase menginisialisasi koneksi ke PostgreSQL menggunakan sqlx.
+
+Alur kerja:
+1. Ambil kredensial wajib dari env via MustGetEnv
+2. Bangun DSN (Data Source Name)
+3. Buka koneksi dengan sqlx.Connect
+4. Test koneksi dengan Ping
+5. Atur connection pool (max open/idle, lifetime)
+6. Return DBConfig siap pakai
+
+Output sukses:
+- (*DBConfig, nil) → koneksi berhasil dan siap digunakan
+Output error:
+- (nil, error) → gagal koneksi / ping / env tidak lengkap
+*/
+func InitDatabase() (*DBConfig, error) {
 	user := MustGetEnv("DB_USER")
 	pass := MustGetEnv("DB_PASSWORD")
 	host := MustGetEnv("DB_HOST")
@@ -38,7 +64,7 @@ func DatabaseConfig() (*Config, error) {
 
 	ssl := os.Getenv("DB_SSL_MODE")
 	if ssl == "" {
-		ssl = "require"
+		ssl = "require" // Supabase & production wajib SSL
 	}
 
 	dsn := fmt.Sprintf(
@@ -46,65 +72,55 @@ func DatabaseConfig() (*Config, error) {
 		user, pass, host, port, name, ssl,
 	)
 
+	log.Println("Connecting to PostgreSQL...")
 	db, err := sqlx.Connect("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", message.InternalError, err)
 	}
 
+	// Verifikasi koneksi aktif
 	if err := db.Ping(); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("%s: %w", message.InternalError, err)
+		return nil, fmt.Errorf("database ping failed: %w", err)
 	}
 
-	log.Println("Database connected successfully")
+	// Optimasi connection pool untuk production
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * 60) // 5 menit
 
-	return &Config{
+	log.Println("Database connected successfully")
+	return &DBConfig{
 		DB:      db,
 		User:    user,
 		Pass:    pass,
 		Host:    host,
 		Port:    port,
-		DBName:  name,
+		Name:    name,
 		SSLMode: ssl,
 	}, nil
 }
 
 /*
-GetStorageAccessKey
-mengambil access key untuk storage dari environment
-*/
-func GetStorageAccessKey() string {
-	return MustGetEnv("STORAGE_ACCESS_KEY")
-}
+LoadStorageConfig mengembalikan konfigurasi Supabase Storage dari environment.
 
-/*
-GetStorageSecretKey
-mengambil secret key untuk storage dari environment
-*/
-func GetStorageSecretKey() string {
-	return MustGetEnv("STORAGE_SECRET_KEY")
-}
+Alur kerja:
+1. Baca semua variabel wajib via MustGetEnv
+2. Kembalikan struct StorageConfig lengkap
 
-/*
-GetStorageEndpoint
-mengambil endpoint untuk storage dari environment
+Output sukses:
+- StorageConfig → semua field terisi
+Output error:
+- log.Fatal (panic) → jika ada env yang hilang (via MustGetEnv)
 */
-func GetStorageEndpoint() string {
-	return MustGetEnv("STORAGE_ENDPOINT")
-}
-
-/*
-GetStorageRegion
-mengambil region untuk storage dari environment
-*/
-func GetStorageRegion() string {
-	return MustGetEnv("STORAGE_REGION")
-}
-
-/*
-GetStorageBucket
-mengambil nama bucket untuk storage dari environment
-*/
-func GetStorageBucket() string {
-	return MustGetEnv("STORAGE_BUCKET")
+func LoadStorageConfig() StorageConfig {
+	return StorageConfig{
+		AccessKey: MustGetEnv("STORAGE_ACCESS_KEY"),
+		SecretKey: MustGetEnv("STORAGE_SECRET_KEY"),
+		Endpoint:  MustGetEnv("STORAGE_ENDPOINT"),
+		Region:    MustGetEnv("STORAGE_REGION"),
+		Bucket:    MustGetEnv("STORAGE_BUCKET"),
+		ProjectID: MustGetEnv("STORAGE_PROJECT_ID"),
+		Domain:    MustGetEnv("STORAGE_DOMAIN"),
+	}
 }
