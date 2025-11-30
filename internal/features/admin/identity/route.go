@@ -2,6 +2,7 @@ package identity
 
 import (
 	"lalan-be/internal/middleware"
+	"net/http"
 
 	"github.com/gorilla/mux"
 )
@@ -27,12 +28,12 @@ func SetupAdminIdentityRoutes(router *mux.Router, handler *AdminIdentityHandler)
 	protected.Use(middleware.JWTMiddleware)
 	protected.Use(middleware.Admin)
 
-	// Resource khusus untuk pending identities
 	protected.HandleFunc("/pending", handler.GetPendingIdentities).Methods("GET")
-
-	// Explicit path untuk mengambil identity berdasarkan User ID
 	protected.HandleFunc("/user/{userID}", handler.GetIdentity).Methods("GET")
-
-	// Validate by specific identity record ID
 	protected.HandleFunc("/{id}/validate", handler.ValidateIdentity).Methods("POST")
+
+	// Opsional: handler khusus OPTIONS biar return 204 (lebih bersih)
+	protected.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
 }

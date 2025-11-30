@@ -1,0 +1,248 @@
+package item
+
+import (
+	"database/sql"
+	"encoding/json"
+	"lalan-be/internal/domain"
+	"lalan-be/internal/dto"
+	"log"
+
+	"github.com/jmoiron/sqlx"
+)
+
+/*
+HosterItemRepository mendefinisikan operasi database khusus perspektif hoster.
+Digunakan untuk dashboard item yang dimiliki hoster.
+*/
+type HosterItemRepository interface {
+	GetListItem(hosterID string) ([]dto.ItemListByHosterResponse, error)
+	CreateItem(item *domain.Item) (*dto.ItemDetailByHosterResponse, error)
+	// DeleteItem menghapus item berdasarkan id dan memastikan hoster pemiliknya
+	DeleteItem(hosterID, itemID string) error
+}
+
+/*
+hosterItemRepository adalah implementasi repository untuk hoster-facing item.
+*/
+type hosterItemRepository struct {
+	db *sqlx.DB
+}
+
+/*
+NewHosterItemRepository membuat instance repository dengan koneksi database.
+
+Output:
+- HosterItemRepository siap digunakan
+*/
+func NewHosterItemRepository(db *sqlx.DB) HosterItemRepository {
+	return &hosterItemRepository{db: db}
+}
+
+/*
+GetListItem mengambil ringkasan semua item yang dimiliki hoster.
+
+Alur kerja:
+1. Query item dengan filter hoster_id
+2. Order by name untuk kemudahan di frontend
+
+Output sukses:
+- ([]dto.ItemListByHosterResponse, nil)
+Output error:
+- (nil, error) → query gagal
+*/
+func (r *hosterItemRepository) GetListItem(hosterID string) ([]dto.ItemListByHosterResponse, error) {
+	query := `
+        SELECT
+            id,
+            name,
+            stock,
+            price_per_day,
+            pickup_type
+        FROM item
+        WHERE hoster_id = $1
+        ORDER BY name ASC
+    `
+
+	var items []dto.ItemListByHosterResponse
+	err := r.db.Select(&items, query, hosterID)
+	if err != nil {
+		log.Printf("GetListItem: database error for hoster %s: %v", hosterID, err)
+		return nil, err
+	}
+
+	return items, nil
+}
+
+/*
+CreateItem menyimpan item baru ke dalam database.
+
+Alur kerja:
+1. Menyusun query INSERT untuk menambah item
+2. Menjalankan query dengan parameter yang diberikan
+3. Mengembalikan ID item yang baru dibuat
+
+Output sukses:
+- (id_item_baru, nil)
+Output error:
+- ("", error) → query gagal
+*/
+func (r *hosterItemRepository) CreateItem(item *domain.Item) (*dto.ItemDetailByHosterResponse, error) {
+	// mulai transaction
+	tx, err := r.db.Beginx()
+	if err != nil {
+		log.Printf("CreateItem: error starting transaction: %v", err)
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	query := `
+        INSERT INTO item (
+            id, hoster_id, name, description, photos, stock, pickup_type,
+            price_per_day, deposit, discount, category_id, created_at, updated_at
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),NOW())
+    `
+	photosJSON, err := json.Marshal(item.Photos)
+	if err != nil {
+		log.Printf("CreateItem: failed to marshal photos for item %s: %v", item.ID, err)
+		return nil, err
+	}
+
+	_, err = tx.Exec(query,
+		item.ID, item.HosterID, item.Name, item.Description, photosJSON,
+		item.Stock, item.PickupType, item.PricePerDay, item.Deposit, item.Discount,
+		item.CategoryID,
+	)
+	if err != nil {
+		log.Printf("CreateItem: error inserting item %s: %v", item.ID, err)
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		log.Printf("CreateItem: error committing transaction: %v", err)
+		return nil, err
+	}
+
+	// ambil detail item yang baru dibuat dan return
+	// jsonb `photos` returns []byte from driver — scan into json.RawMessage then unmarshal into []string
+	var (
+		detail dto.ItemDetailByHosterResponse
+		row    struct {
+			ID          string          `db:"id"`
+			Name        string          `db:"name"`
+			Description sql.NullString  `db:"description"`
+			Photos      json.RawMessage `db:"photos"`
+			Stock       int             `db:"stock"`
+			PickupType  string          `db:"pickup_type"`
+			PricePerDay int             `db:"price_per_day"`
+			Deposit     int             `db:"deposit"`
+			Discount    sql.NullInt64   `db:"discount"`
+			CreatedAt   sql.NullTime    `db:"created_at"`
+			UpdatedAt   sql.NullTime    `db:"updated_at"`
+			CategoryID  string          `db:"category_id"`
+			HosterID    string          `db:"hoster_id"`
+		}
+	)
+
+	getQuery := `
+        SELECT id, name, description, photos, stock, pickup_type,
+               price_per_day, deposit, discount, created_at, updated_at, category_id, hoster_id
+        FROM item WHERE id = $1
+    `
+	err = r.db.Get(&row, getQuery, item.ID)
+	if err != nil {
+		log.Printf("CreateItem: failed to load created item detail %s: %v", item.ID, err)
+		return nil, err
+	}
+
+	// convert nullable fields + unmarshal photos
+	if row.Description.Valid {
+		detail.Description = row.Description.String
+	}
+	if row.Discount.Valid {
+		detail.Discount = int(row.Discount.Int64)
+	}
+	if row.CreatedAt.Valid {
+		detail.CreatedAt = row.CreatedAt.Time
+	}
+	if row.UpdatedAt.Valid {
+		detail.UpdatedAt = row.UpdatedAt.Time
+	}
+	if len(row.Photos) > 0 {
+		var photos []string
+		if err = json.Unmarshal(row.Photos, &photos); err != nil {
+			log.Printf("CreateItem: failed to unmarshal photos for item %s: %v", item.ID, err)
+			return nil, err
+		}
+		detail.Photos = photos
+	}
+
+	detail.ID = row.ID
+
+	detail.Name = row.Name
+	detail.Stock = row.Stock
+	detail.PickupType = dto.PickupMethod(row.PickupType)
+	detail.PricePerDay = row.PricePerDay
+	detail.Deposit = row.Deposit
+	detail.CategoryID = row.CategoryID
+	detail.HosterID = row.HosterID
+
+	return &detail, nil
+}
+
+/*
+DeleteItem menghapus item milik hoster.
+Alur:
+1. Mulai transaction
+2. DELETE dari tabel item dengan filter id (diasumsikan milik hoster yang login)
+3. Jika tidak ada baris yang terhapus -> kembalikan sql.ErrNoRows
+4. Commit bila sukses
+*/
+func (r *hosterItemRepository) DeleteItem(hosterID, itemID string) error {
+	// mulai transaction
+	tx, err := r.db.Beginx()
+	if err != nil {
+		log.Printf("DeleteItem: error starting transaction: %v", err)
+		return err
+	}
+	defer tx.Rollback()
+
+	// cek pemilik item dulu (debug & keamanan)
+	var ownerID string
+	if err := tx.Get(&ownerID, `SELECT hoster_id FROM item WHERE id = $1`, itemID); err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("DeleteItem: item %s not found", itemID)
+			return sql.ErrNoRows
+		}
+		log.Printf("DeleteItem: failed to query owner for item %s: %v", itemID, err)
+		return err
+	}
+	if ownerID != hosterID {
+		log.Printf("DeleteItem: ownership mismatch for item %s owner=%s requester=%s", itemID, ownerID, hosterID)
+		return sql.ErrNoRows
+	}
+
+	query := `DELETE FROM item WHERE id = $1 AND hoster_id = $2`
+	res, err := tx.Exec(query, itemID, hosterID)
+	if err != nil {
+		log.Printf("DeleteItem: error deleting item %s for hoster %s: %v", itemID, hosterID, err)
+		return err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		log.Printf("DeleteItem: failed to get rows affected for item %s: %v", itemID, err)
+		return err
+	}
+	log.Printf("DeleteItem: rows affected = %d for item %s hoster %s", rows, itemID, hosterID)
+	if rows == 0 {
+		// tidak ada item yang terhapus -> kemungkinan tidak ada atau bukan milik hoster
+		return sql.ErrNoRows
+	}
+
+	if err = tx.Commit(); err != nil {
+		log.Printf("DeleteItem: error committing transaction for item %s: %v", itemID, err)
+		return err
+	}
+
+	return nil
+}

@@ -2,6 +2,7 @@ package booking
 
 import (
 	"lalan-be/internal/middleware"
+	"net/http"
 
 	"github.com/gorilla/mux"
 )
@@ -36,4 +37,9 @@ func SetupBookingRoutes(router *mux.Router, h *BookingHandler) {
 	protected.HandleFunc("/booking", h.GetListBookings).Methods("GET")
 	protected.HandleFunc("/booking/{id}", h.GetDetailBooking).Methods("GET")
 	protected.HandleFunc("/booking", h.CreateBooking).Methods("POST")
+
+	// Opsional: handler khusus OPTIONS biar return 204 (lebih bersih)
+	protected.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
 }

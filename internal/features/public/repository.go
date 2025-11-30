@@ -91,7 +91,7 @@ func (r *publicRepository) GetAllItems() ([]*domain.Item, error) {
 		err := rows.Scan(
 			&item.ID, &item.Name, &item.Description, &photosJSON, &item.Stock,
 			&item.PickupType, &item.PricePerDay, &item.Deposit, &item.Discount,
-			&item.CategoryID, &item.UserID, &item.CreatedAt, &item.UpdatedAt,
+			&item.CategoryID, &item.HosterID, &item.CreatedAt, &item.UpdatedAt,
 		)
 		if err != nil {
 			log.Printf("GetAllItems scan error: %v", err)

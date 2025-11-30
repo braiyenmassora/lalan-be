@@ -61,12 +61,18 @@ func (r *hosterBookingRepository) GetListBookings(hosterID string) ([]dto.Bookin
 			b.end_date::timestamptz AS end_date,
 			b.total,
 			b.status,
-			COALESCE(string_agg(bi.name, ', '), '') AS item_names,
-			COALESCE(SUM(bi.quantity), 0) AS total_items
+			COALESCE(items.item_name, '') AS item_name,
+			COALESCE(items.total_item, 0) AS total_item,
+			COALESCE(NULLIF(bc.name, ''), c.full_name, '') AS customer_name
 		FROM booking b
-		LEFT JOIN booking_item bi ON b.id = bi.booking_id
+		LEFT JOIN (
+			SELECT booking_id, string_agg(name, ', ' ORDER BY name) AS item_name, SUM(quantity) AS total_item
+			FROM booking_item
+			GROUP BY booking_id
+		) items ON items.booking_id = b.id
+		LEFT JOIN booking_customer bc ON bc.booking_id = b.id
+		LEFT JOIN customer c ON c.id = b.user_id
 		WHERE b.hoster_id = $1
-		GROUP BY b.id, b.start_date, b.end_date, b.total, b.status
 		ORDER BY b.created_at DESC
 	`
 

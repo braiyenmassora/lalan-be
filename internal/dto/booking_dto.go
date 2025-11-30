@@ -122,13 +122,14 @@ type BookingDetailByHosterResponse struct {
 // BookingListByHosterResponse adalah response untuk list booking hoster
 // Endpoint: GET /hoster/booking
 type BookingListByHosterResponse struct {
-	BookingID  string    `json:"booking_id" db:"booking_id"`
-	StartDate  time.Time `json:"start_date" db:"start_date"`
-	EndDate    time.Time `json:"end_date" db:"end_date"`
-	Total      int64     `json:"total" db:"total"`
-	Status     string    `json:"status" db:"status"`
-	ItemNames  string    `json:"item_name" db:"item_names"`
-	TotalItems int       `json:"total_item" db:"total_items"`
+	BookingID    string    `json:"booking_id" db:"booking_id"`
+	StartDate    time.Time `json:"start_date" db:"start_date"`
+	EndDate      time.Time `json:"end_date" db:"end_date"`
+	Total        float64   `json:"total" db:"total"`
+	Status       string    `json:"status" db:"status"`
+	ItemName     string    `json:"item_name" db:"item_name"`
+	TotalItem    int       `json:"total_item" db:"total_item"`
+	CustomerName string    `json:"customer_name" db:"customer_name"`
 }
 
 // CustomerListByHosterResponse adalah response untuk list customer yang pernah booking
