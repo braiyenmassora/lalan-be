@@ -80,7 +80,7 @@ func (s *publicService) GetAllItems() ([]dto.ItemPublicResponse, error) {
 			CreatedAt:   item.CreatedAt,
 			UpdatedAt:   item.UpdatedAt,
 			CategoryID:  item.CategoryID,
-			UserID:      item.UserID,
+			HosterID:    item.HosterID,
 		})
 	}
 

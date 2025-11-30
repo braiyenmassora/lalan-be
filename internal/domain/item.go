@@ -24,25 +24,6 @@ const (
 )
 
 // ===================================================================
-// CATEGORY
-// ===================================================================
-
-// Category adalah entity untuk kategori item.
-// Digunakan untuk mengelompokkan item agar mudah dicari oleh customer.
-//
-// Contoh kategori: "Kamera", "Laptop", "Tenda", "Alat Outdoor", dll
-//
-// Relasi:
-// - Category has many Item
-type Category struct {
-	ID          string    `json:"id" db:"id"`
-	Name        string    `json:"name" db:"name"`
-	Description string    `json:"description" db:"description"`
-	CreatedAt   time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
-}
-
-// ===================================================================
 // ITEM
 // ===================================================================
 
@@ -64,14 +45,14 @@ type Item struct {
 	ID          string       `json:"id" db:"id"`
 	Name        string       `json:"name" db:"name"`
 	Description string       `json:"description" db:"description"`
-	Photos      []string     `json:"photos" db:"photos"`               // Array URL foto item
-	Stock       int          `json:"stock" db:"stock"`                 // Jumlah unit tersedia
-	PickupType  PickupMethod `json:"pickup_type" db:"pickup_type"`     // "pickup" atau "delivery"
-	PricePerDay int          `json:"price_per_day" db:"price_per_day"` // Harga sewa per hari (dalam satuan terkecil, misal: rupiah)
-	Deposit     int          `json:"deposit" db:"deposit"`             // Deposit per unit
-	Discount    int          `json:"discount,omitempty" db:"discount"` // Diskon (opsional)
+	Photos      []string     `json:"photos" db:"photos"`
+	Stock       int          `json:"stock" db:"stock"`
+	PickupType  PickupMethod `json:"pickup_type" db:"pickup_type"`
+	PricePerDay int          `json:"price_per_day" db:"price_per_day"`
+	Deposit     int          `json:"deposit" db:"deposit"`
+	Discount    int          `json:"discount,omitempty" db:"discount"`
 	CreatedAt   time.Time    `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time    `json:"updated_at" db:"updated_at"`
 	CategoryID  string       `json:"category_id" db:"category_id"` // FK ke Category
-	UserID      string       `json:"user_id" db:"user_id"`         // FK ke Hoster
+	HosterID    string       `json:"hoster_id" db:"hoster_id"`     // FK ke Hoster
 }

@@ -65,7 +65,7 @@ type ItemPublicResponse struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	CategoryID  string    `json:"category_id"`
-	UserID      string    `json:"user_id"`
+	HosterID    string    `json:"hoster_id"`
 }
 
 // TermsAndConditionsPublicResponse adalah response untuk syarat dan ketentuan

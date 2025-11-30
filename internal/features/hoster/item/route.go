@@ -1,4 +1,4 @@
-package booking
+package item
 
 import (
 	"lalan-be/internal/middleware"
@@ -8,29 +8,30 @@ import (
 )
 
 /*
-SetupBookingRoutes mendaftarkan semua endpoint booking untuk hoster.
+SetupItemRoutes mendaftarkan semua endpoint item untuk hoster.
 
 Alur kerja:
 1. Buat subrouter dengan prefix /api/v1/hoster
 2. Terapkan middleware JWT → Hoster (protected route)
 3. Daftarkan endpoint:
-  - GET  /booking          → daftar semua booking milik hoster
-  - GET  /booking/{id}     → detail satu booking
+  - GET  /item         → daftar semua item milik hoster
+  - POST /item         → buat item baru oleh hoster
+  - DELETE /item/{id}  → hapus item milik hoster berdasarkan ID (hoster diambil dari session/token)
 
 Output:
 - Router terkonfigurasi dengan endpoint hoster yang aman dan siap digunakan
 */
-func SetupBookingRoutes(router *mux.Router, h *BookingHandler) {
+func SetupItemRoutes(router *mux.Router, h *HosterItemHandler) {
 	protected := router.PathPrefix("/api/v1/hoster").Subrouter()
 
 	// JWT + Role check
 	protected.Use(middleware.JWTMiddleware)
 	protected.Use(middleware.Hoster)
 
-	// Route normal
-	protected.HandleFunc("/booking", h.GetListBookings).Methods("GET", "OPTIONS")
-	protected.HandleFunc("/booking/{id}", h.GetDetailBooking).Methods("GET", "OPTIONS")
-	protected.HandleFunc("/customer", h.GetCustomerList).Methods("GET", "OPTIONS")
+	// Route normal (use singular "item")
+	protected.HandleFunc("/item", h.GetListItem).Methods("GET", "OPTIONS")
+	protected.HandleFunc("/item", h.CreateItem).Methods("POST", "OPTIONS")
+	protected.HandleFunc("/item/{id}", h.DeleteItem).Methods("DELETE", "OPTIONS")
 
 	// Opsional: handler khusus OPTIONS biar return 204 (lebih bersih)
 	protected.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

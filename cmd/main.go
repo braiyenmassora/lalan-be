@@ -15,6 +15,7 @@ import (
 	booking "lalan-be/internal/features/customer/booking"
 	custidentity "lalan-be/internal/features/customer/identity"
 	hosterbooking "lalan-be/internal/features/hoster/booking"
+	hosteritem "lalan-be/internal/features/hoster/item"
 	public "lalan-be/internal/features/public"
 	"lalan-be/internal/middleware"
 	"lalan-be/internal/utils"
@@ -48,13 +49,21 @@ func main() {
 	storage := utils.NewSupabaseStorageFromEnv()
 
 	// 5. Inisialisasi handler dengan dependency injection
+	// Public & Auth
 	pubHandler := public.NewPublicHandler(public.NewPublicService(public.NewPublicRepository(dbCfg.DB)))
 	authHandler := auth.NewAuthHandler(auth.NewAuthService(auth.NewAuthRepository(dbCfg.DB)))
+
+	// Customer
 	bookingHandler := booking.NewBookingHandler(booking.NewBookingService(booking.NewBookingRepository(dbCfg.DB)))
-	hosterHandler := hosterbooking.NewBookingHandler(hosterbooking.NewBookingService(hosterbooking.NewHosterBookingRepository(dbCfg.DB)))
 	customerIdentityHandler := custidentity.NewIdentityHandler(
 		custidentity.NewIdentityService(custidentity.NewIdentityRepository(dbCfg.DB), storage),
 	)
+
+	// Hoster
+	hosterHandler := hosterbooking.NewBookingHandler(hosterbooking.NewBookingService(hosterbooking.NewHosterBookingRepository(dbCfg.DB)))
+	hosterItemHandler := hosteritem.NewHosterItemHandler(hosteritem.NewItemService(hosteritem.NewHosterItemRepository(dbCfg.DB)))
+
+	// Admin
 	adminIdentityHandler := adminidentity.NewAdminIdentityHandler(
 		adminidentity.NewAdminIdentityService(adminidentity.NewAdminIdentityRepository(dbCfg.DB)),
 	)
@@ -64,11 +73,20 @@ func main() {
 	router.Use(middleware.CORSMiddleware)
 	router.HandleFunc("/health", healthCheck).Methods("GET")
 
+	// Public & Auth
 	public.SetupPublicRoutes(router, pubHandler)
 	auth.SetupAuthRoutes(router, authHandler)
+
+	// Customer
 	booking.SetupBookingRoutes(router, bookingHandler)
-	hosterbooking.SetupBookingRoutes(router, hosterHandler)
 	custidentity.SetupIdentityRoutes(router, customerIdentityHandler)
+
+	// Hoster
+	hosterbooking.SetupBookingRoutes(router, hosterHandler)
+	hosteritem.SetupItemRoutes(router, hosterItemHandler)
+	log.Println("Hoster item routes registered (GET /item, POST /item, DELETE /item/{id})")
+
+	// Admin
 	adminidentity.SetupAdminIdentityRoutes(router, adminIdentityHandler)
 
 	// 7. Konfigurasi HTTP server dengan timeout aman

@@ -2,6 +2,7 @@ package identity
 
 import (
 	"lalan-be/internal/middleware"
+	"net/http"
 
 	"github.com/gorilla/mux"
 )
@@ -36,4 +37,9 @@ func SetupIdentityRoutes(router *mux.Router, h *IdentityHandler) {
 	identity.HandleFunc("/identity", h.UploadKTP).Methods("POST")
 	identity.HandleFunc("/identity", h.UpdateKTP).Methods("PUT")
 	identity.HandleFunc("/identity", h.GetStatusKTP).Methods("GET")
+
+	// Opsional: handler khusus OPTIONS biar return 204 (lebih bersih)
+	identity.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
 }

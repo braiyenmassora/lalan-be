@@ -132,7 +132,7 @@ func (h *BookingHandler) GetListBookings(w http.ResponseWriter, r *http.Request)
 		}
 		return
 	}
-
+	log.Printf("Handler GetListBookings: bookings data: %+v", bookings)
 	response.OK(w, bookings, message.Success)
 }
 

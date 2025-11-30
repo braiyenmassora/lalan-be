@@ -21,6 +21,12 @@ const (
 	FileTooLarge  = "%s too large"
 	UploadFailed  = "failed to upload %s"
 
+	// ITEM specific messages (optional, explicit)
+	ItemCreated  = "item created"
+	ItemUpdated  = "item updated"
+	ItemDeleted  = "item deleted"
+	ItemNotFound = "item not found"
+
 	// Authentication & Authorization
 	LoginFailed            = "invalid email or password"
 	AdminAccessRequired    = "admin access required"
@@ -56,5 +62,6 @@ const (
 	IdentityPendingReview           = "identity under review"
 
 	// Additional
-	EmailAlreadyExists = "email already exists"
+	EmailAlreadyExists    = "email already exists"
+	CategoryAlreadyExists = "category already exists"
 )
