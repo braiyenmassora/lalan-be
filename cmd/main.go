@@ -46,7 +46,8 @@ func main() {
 	}
 
 	// 4. Inisialisasi storage
-	storage := utils.NewSupabaseStorageFromEnv()
+	cfg := config.LoadStorageConfig()
+	storage := utils.NewSupabaseStorageFromEnv() // Atau NewSupabaseStorage(cfg) jika perlu custom
 
 	// 5. Inisialisasi handler dengan dependency injection
 	// Public & Auth
@@ -61,7 +62,7 @@ func main() {
 
 	// Hoster
 	hosterHandler := hosterbooking.NewBookingHandler(hosterbooking.NewBookingService(hosterbooking.NewHosterBookingRepository(dbCfg.DB)))
-	hosterItemHandler := hosteritem.NewHosterItemHandler(hosteritem.NewItemService(hosteritem.NewHosterItemRepository(dbCfg.DB)))
+	hosterItemHandler := hosteritem.NewHosterItemHandler(hosteritem.NewItemService(hosteritem.NewHosterItemRepository(dbCfg.DB), storage, cfg))
 
 	// Admin
 	adminIdentityHandler := adminidentity.NewAdminIdentityHandler(

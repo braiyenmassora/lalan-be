@@ -63,7 +63,7 @@ Implementasi saat ini: Supabase (S3-compatible).
 */
 type Storage interface {
 	Upload(ctx context.Context, file io.Reader, path string, contentType string) (string, error)
-	UploadFile(ctx context.Context, fileHeader *multipart.FileHeader, folder string) (*FileMetadata, error)
+	UploadFile(ctx context.Context, fileHeader *multipart.FileHeader, folder string, bucket string) (*FileMetadata, error) // Tambah parameter bucket
 	Delete(ctx context.Context, path string) error
 	Exists(ctx context.Context, path string) (bool, error)
 	GetPresignedURL(ctx context.Context, path string, expiry time.Duration) (string, error)
@@ -173,7 +173,7 @@ Output sukses:
 Output error:
 - error → ukuran/tipe tidak valid / gagal buka file / gagal upload
 */
-func (s *SupabaseStorage) UploadFile(ctx context.Context, fileHeader *multipart.FileHeader, folder string) (*FileMetadata, error) {
+func (s *SupabaseStorage) UploadFile(ctx context.Context, fileHeader *multipart.FileHeader, folder string, bucket string) (*FileMetadata, error) {
 	if fileHeader.Size > MaxFileSize {
 		return nil, fmt.Errorf("file size exceeds maximum allowed size of %d bytes", MaxFileSize)
 	}
@@ -197,7 +197,8 @@ func (s *SupabaseStorage) UploadFile(ctx context.Context, fileHeader *multipart.
 	uniqueName := fmt.Sprintf("%s%s", uuid.New().String(), ext)
 	path := buildFilePath(folder, uniqueName)
 
-	url, err := s.Upload(ctx, file, path, contentType)
+	// Upload dengan bucket parameter
+	url, err := s.uploadWithBucket(ctx, file, path, contentType, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +212,7 @@ func (s *SupabaseStorage) UploadFile(ctx context.Context, fileHeader *multipart.
 		UploadedAt:  time.Now(),
 	}
 
-	log.Printf("SupabaseStorage UploadFile: uploaded %s → %s", fileHeader.Filename, url)
+	log.Printf("SupabaseStorage UploadFile: uploaded %s to bucket %s → %s", fileHeader.Filename, bucket, url)
 	return metadata, nil
 }
 
@@ -323,6 +324,36 @@ func (s *SupabaseStorage) buildPublicURL(path string) string {
 	return fmt.Sprintf("%s/%s/%s", s.config.Domain, s.config.Bucket, path)
 }
 
+// Tambah helper uploadWithBucket (jika belum ada)
+func (s *SupabaseStorage) uploadWithBucket(ctx context.Context, file io.Reader, path string, contentType string, bucket string) (string, error) {
+	client, err := s.getClient()
+	if err != nil {
+		return "", err
+	}
+
+	path = sanitizePath(path)
+
+	_, err = client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(path),
+		Body:        file,
+		ContentType: aws.String(contentType),
+	})
+	if err != nil {
+		log.Printf("SupabaseStorage uploadWithBucket: failed to upload %s to bucket %s: %v", path, bucket, err)
+		return "", fmt.Errorf("failed to upload file: %w", err)
+	}
+
+	publicURL := s.buildPublicURLWithBucket(path, bucket)
+	log.Printf("SupabaseStorage uploadWithBucket: success %s to bucket %s → %s", path, bucket, publicURL)
+	return publicURL, nil
+}
+
+// Tambah helper buildPublicURLWithBucket
+func (s *SupabaseStorage) buildPublicURLWithBucket(path string, bucket string) string {
+	return fmt.Sprintf("%s/%s/%s", s.config.Domain, bucket, path)
+}
+
 // Helper functions
 
 /*
@@ -352,7 +383,7 @@ func validateContentType(contentType, folder string) error {
 	contentType = strings.ToLower(strings.TrimSpace(contentType))
 
 	switch folder {
-	case "ktp", "profile", "avatar":
+	case "ktp", "profile", "avatar", "hoster/item": // Tambah "hoster/item"
 		if !AllowedImageTypes[contentType] {
 			return fmt.Errorf("invalid image type: %s. Allowed: jpg, jpeg, png, webp", contentType)
 		}

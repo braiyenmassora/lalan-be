@@ -1,13 +1,17 @@
 package item
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"log"
+	"mime/multipart"
 
+	"lalan-be/internal/config"
 	"lalan-be/internal/domain"
 	"lalan-be/internal/dto"
 	"lalan-be/internal/message"
+	"lalan-be/internal/utils"
 )
 
 /*
@@ -16,8 +20,7 @@ Menyediakan operasi read (list) dan create untuk hoster.
 */
 type ItemService interface {
 	GetListItem(hosterID string) ([]dto.ItemListByHosterResponse, error)
-	CreateItem(item *domain.Item) (*dto.ItemDetailByHosterResponse, error)
-	// DeleteItem menghapus item milik hoster berdasarkan id item
+	CreateItem(ctx context.Context, item *domain.Item, photoFiles []*multipart.FileHeader) (*dto.ItemDetailByHosterResponse, error)
 	DeleteItem(hosterID, itemID string) error
 }
 
@@ -26,7 +29,9 @@ itemService adalah implementasi konkret dari ItemService.
 Mengandung dependency ke repository untuk akses data.
 */
 type itemService struct {
-	repo HosterItemRepository
+	repo    HosterItemRepository
+	storage utils.Storage
+	config  config.StorageConfig // Tambah config untuk akses ItemBucket
 }
 
 /*
@@ -35,8 +40,8 @@ NewItemService membuat instance service dengan dependency injection.
 Output:
 - ItemService siap digunakan
 */
-func NewItemService(repo HosterItemRepository) ItemService {
-	return &itemService{repo: repo}
+func NewItemService(repo HosterItemRepository, storage utils.Storage, config config.StorageConfig) ItemService {
+	return &itemService{repo: repo, storage: storage, config: config}
 }
 
 /*
@@ -79,7 +84,8 @@ Output sukses:
 Output error:
 - (nil, error) → unauthorized / bad request / internal error
 */
-func (s *itemService) CreateItem(item *domain.Item) (*dto.ItemDetailByHosterResponse, error) {
+func (s *itemService) CreateItem(ctx context.Context, item *domain.Item, photoFiles []*multipart.FileHeader) (*dto.ItemDetailByHosterResponse, error) {
+	// Validasi existing
 	if item == nil || item.HosterID == "" {
 		return nil, errors.New(message.Unauthorized)
 	}
@@ -96,6 +102,21 @@ func (s *itemService) CreateItem(item *domain.Item) (*dto.ItemDetailByHosterResp
 		return nil, errors.New(message.BadRequest)
 	}
 
+	// Handle upload jika ada photoFiles
+	if photoFiles != nil && len(photoFiles) > 0 {
+		var photoURLs []string
+		for _, fileHeader := range photoFiles {
+			metadata, err := s.storage.UploadFile(ctx, fileHeader, "hoster/item", s.config.ItemBucket) // Gunakan bucket item
+			if err != nil {
+				log.Printf("CreateItem: upload failed for %s: %v", fileHeader.Filename, err)
+				return nil, errors.New(message.InternalError)
+			}
+			photoURLs = append(photoURLs, metadata.URL)
+		}
+		item.Photos = photoURLs
+	}
+
+	// Panggil repository
 	created, err := s.repo.CreateItem(item)
 	if err != nil {
 		log.Printf("CreateItem(hoster service): repo error for hoster %s: %v", item.HosterID, err)

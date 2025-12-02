@@ -30,13 +30,14 @@ StorageConfig berisi semua konfigurasi untuk Supabase Storage (S3-compatible).
 Digunakan oleh utils.Storage untuk upload, delete, dan presigned URL.
 */
 type StorageConfig struct {
-	AccessKey string
-	SecretKey string
-	Endpoint  string
-	Region    string
-	Bucket    string
-	ProjectID string
-	Domain    string
+	AccessKey  string
+	SecretKey  string
+	Endpoint   string
+	Region     string
+	Bucket     string // Existing untuk KTP
+	ItemBucket string // Tambah untuk item
+	ProjectID  string
+	Domain     string
 }
 
 /*
@@ -115,12 +116,13 @@ Output error:
 */
 func LoadStorageConfig() StorageConfig {
 	return StorageConfig{
-		AccessKey: MustGetEnv("STORAGE_ACCESS_KEY"),
-		SecretKey: MustGetEnv("STORAGE_SECRET_KEY"),
-		Endpoint:  MustGetEnv("STORAGE_ENDPOINT"),
-		Region:    MustGetEnv("STORAGE_REGION"),
-		Bucket:    MustGetEnv("STORAGE_BUCKET"),
-		ProjectID: MustGetEnv("STORAGE_PROJECT_ID"),
-		Domain:    MustGetEnv("STORAGE_DOMAIN"),
+		AccessKey:  MustGetEnv("STORAGE_ACCESS_KEY"),
+		SecretKey:  MustGetEnv("STORAGE_SECRET_KEY"),
+		Endpoint:   MustGetEnv("STORAGE_ENDPOINT"),
+		Region:     MustGetEnv("STORAGE_REGION"),
+		Bucket:     MustGetEnv("STORAGE_BUCKET"),
+		ItemBucket: MustGetEnv("STORAGE_ITEM_BUCKET"),
+		ProjectID:  MustGetEnv("STORAGE_PROJECT_ID"),
+		Domain:     MustGetEnv("STORAGE_DOMAIN"),
 	}
 }
