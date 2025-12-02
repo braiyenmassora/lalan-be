@@ -6,6 +6,8 @@ import (
 	"errors"
 	"log"
 	"mime/multipart"
+	"strconv"
+	"time"
 
 	"lalan-be/internal/config"
 	"lalan-be/internal/domain"
@@ -22,6 +24,7 @@ type ItemService interface {
 	GetListItem(hosterID string) ([]dto.ItemListByHosterResponse, error)
 	CreateItem(ctx context.Context, item *domain.Item, photoFiles []*multipart.FileHeader) (*dto.ItemDetailByHosterResponse, error)
 	DeleteItem(hosterID, itemID string) error
+	UpdateItem(hosterID, itemID string, req *dto.UpdateItemRequestRequest) error // Tambah ini
 }
 
 /*
@@ -89,6 +92,7 @@ func (s *itemService) CreateItem(ctx context.Context, item *domain.Item, photoFi
 	if item == nil || item.HosterID == "" {
 		return nil, errors.New(message.Unauthorized)
 	}
+
 	if item.Name == "" {
 		return nil, errors.New(message.BadRequest)
 	}
@@ -98,15 +102,22 @@ func (s *itemService) CreateItem(ctx context.Context, item *domain.Item, photoFi
 	if item.PricePerDay <= 0 {
 		return nil, errors.New(message.BadRequest)
 	}
+	// Ubah validasi pickup_type
+	log.Printf("CreateItem: item.PickupType='%s', expected self='%s' delivery='%s'", item.PickupType, domain.PickupMethodSelfPickup, domain.PickupMethodDelivery)
+
 	if !(item.PickupType == domain.PickupMethodSelfPickup || item.PickupType == domain.PickupMethodDelivery) {
+		log.Printf("CreateItem: invalid pickup_type")
 		return nil, errors.New(message.BadRequest)
 	}
-
 	// Handle upload jika ada photoFiles
-	if photoFiles != nil && len(photoFiles) > 0 {
+	if len(photoFiles) > 0 {
 		var photoURLs []string
-		for _, fileHeader := range photoFiles {
-			metadata, err := s.storage.UploadFile(ctx, fileHeader, "hoster/item", s.config.ItemBucket) // Gunakan bucket item
+		now := time.Now()
+		dateStr := now.Format("02122005") // DDMMYYYY, e.g., 02122025
+		for i, fileHeader := range photoFiles {
+			newFilename := "item" + strconv.Itoa(i+1) + "_" + dateStr // Sederhanakan filename, karena itemID di path
+			uploadPath := item.HosterID + "/item/" + item.ID          // Tambah /item/{itemID}
+			metadata, err := s.storage.UploadFile(ctx, fileHeader, uploadPath, s.config.HosterBucket, newFilename)
 			if err != nil {
 				log.Printf("CreateItem: upload failed for %s: %v", fileHeader.Filename, err)
 				return nil, errors.New(message.InternalError)
@@ -145,12 +156,71 @@ func (s *itemService) DeleteItem(hosterID, itemID string) error {
 		return errors.New(message.BadRequest)
 	}
 
+	// Ambil photos sebelum delete
+	photos, err := s.repo.GetItemPhotos(itemID)
+	if err != nil {
+		log.Printf("DeleteItem: failed to get photos for item %s: %v", itemID, err)
+		// Lanjut delete, atau return error
+	}
+
+	// Delete dari DB
 	if err := s.repo.DeleteItem(hosterID, itemID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			// item tidak ada atau bukan milik hoster
 			return errors.New(message.BadRequest)
 		}
 		log.Printf("DeleteItem(hoster service): repo error hoster=%s item=%s err=%v", hosterID, itemID, err)
+		return errors.New(message.InternalError)
+	}
+
+	// Hapus photos dari storage
+	for _, url := range photos {
+		path := utils.ExtractPathFromURL(url, s.config.Domain, s.config.HosterBucket) // Gunakan utils
+		if err := s.storage.Delete(context.Background(), path, s.config.HosterBucket); err != nil {
+			log.Printf("DeleteItem: failed to delete photo %s: %v", url, err)
+		}
+	}
+
+	return nil
+}
+
+/*
+UpdateItem mengubah data item oleh hoster.
+Validasi:
+  - hosterID tidak kosong -> Unauthorized
+  - itemID tidak kosong, req tidak nil -> BadRequest
+  - Validasi field req (stock >= 0, pickup_type valid, dll.)
+
+Business:
+  - Panggil repo.UpdateItem
+*/
+func (s *itemService) UpdateItem(hosterID, itemID string, req *dto.UpdateItemRequestRequest) error {
+	if hosterID == "" {
+		return errors.New(message.Unauthorized)
+	}
+	if itemID == "" || req == nil {
+		return errors.New(message.BadRequest)
+	}
+
+	// Validasi field req
+	if req.Stock != nil && *req.Stock < 0 {
+		return errors.New(message.BadRequest)
+	}
+	if req.PickupType != nil && !(*req.PickupType == "self_pickup" || *req.PickupType == "delivery") {
+		return errors.New(message.BadRequest)
+	}
+	if req.Deposit != nil && *req.Deposit < 0 {
+		return errors.New(message.BadRequest)
+	}
+	if req.Discount != nil && *req.Discount < 0 {
+		return errors.New(message.BadRequest)
+	}
+
+	// Panggil repo.UpdateItem
+	if err := s.repo.UpdateItem(hosterID, itemID, req); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New(message.BadRequest)
+		}
+		log.Printf("UpdateItem(service): repo error hoster=%s item=%s err=%v", hosterID, itemID, err)
 		return errors.New(message.InternalError)
 	}
 

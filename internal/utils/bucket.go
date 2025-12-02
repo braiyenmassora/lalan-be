@@ -62,11 +62,11 @@ Storage adalah kontrak (interface) untuk semua operasi object storage.
 Implementasi saat ini: Supabase (S3-compatible).
 */
 type Storage interface {
-	Upload(ctx context.Context, file io.Reader, path string, contentType string) (string, error)
-	UploadFile(ctx context.Context, fileHeader *multipart.FileHeader, folder string, bucket string) (*FileMetadata, error) // Tambah parameter bucket
-	Delete(ctx context.Context, path string) error
-	Exists(ctx context.Context, path string) (bool, error)
-	GetPresignedURL(ctx context.Context, path string, expiry time.Duration) (string, error)
+	Upload(ctx context.Context, file io.Reader, path string, contentType string, bucket string) (string, error)
+	UploadFile(ctx context.Context, fileHeader *multipart.FileHeader, folder string, bucket string, filename string) (*FileMetadata, error) // Tambah filename
+	Delete(ctx context.Context, url string, bucket string) error
+	Exists(ctx context.Context, path string, bucket string) (bool, error)                                  // Tambah bucket
+	GetPresignedURL(ctx context.Context, path string, expiry time.Duration, bucket string) (string, error) // Tambah bucket
 }
 
 /*
@@ -134,7 +134,7 @@ Output sukses:
 Output error:
 - error → gagal init client / upload / network
 */
-func (s *SupabaseStorage) Upload(ctx context.Context, file io.Reader, path string, contentType string) (string, error) {
+func (s *SupabaseStorage) Upload(ctx context.Context, file io.Reader, path string, contentType string, bucket string) (string, error) {
 	client, err := s.getClient()
 	if err != nil {
 		return "", err
@@ -143,7 +143,7 @@ func (s *SupabaseStorage) Upload(ctx context.Context, file io.Reader, path strin
 	path = sanitizePath(path)
 
 	_, err = client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      aws.String(s.config.Bucket),
+		Bucket:      aws.String(bucket),
 		Key:         aws.String(path),
 		Body:        file,
 		ContentType: aws.String(contentType),
@@ -153,9 +153,9 @@ func (s *SupabaseStorage) Upload(ctx context.Context, file io.Reader, path strin
 		return "", fmt.Errorf("failed to upload file: %w", err)
 	}
 
-	publicURL := s.buildPublicURL(path)
-	log.Printf("SupabaseStorage Upload: success %s → %s", path, publicURL)
-	return publicURL, nil
+	url := fmt.Sprintf("%s/%s/%s", s.config.Domain, bucket, path) // Gunakan bucket param
+	log.Printf("SupabaseStorage Upload: success %s → %s", path, url)
+	return url, nil
 }
 
 /*
@@ -173,7 +173,7 @@ Output sukses:
 Output error:
 - error → ukuran/tipe tidak valid / gagal buka file / gagal upload
 */
-func (s *SupabaseStorage) UploadFile(ctx context.Context, fileHeader *multipart.FileHeader, folder string, bucket string) (*FileMetadata, error) {
+func (s *SupabaseStorage) UploadFile(ctx context.Context, fileHeader *multipart.FileHeader, folder string, bucket string, filename string) (*FileMetadata, error) {
 	if fileHeader.Size > MaxFileSize {
 		return nil, fmt.Errorf("file size exceeds maximum allowed size of %d bytes", MaxFileSize)
 	}
@@ -194,7 +194,17 @@ func (s *SupabaseStorage) UploadFile(ctx context.Context, fileHeader *multipart.
 	defer file.Close()
 
 	ext := filepath.Ext(fileHeader.Filename)
-	uniqueName := fmt.Sprintf("%s%s", uuid.New().String(), ext)
+	var uniqueName string
+	if filename != "" {
+		// Gunakan custom filename, tambah ext jika belum ada
+		if !strings.HasSuffix(filename, ext) {
+			filename += ext
+		}
+		uniqueName = filename
+	} else {
+		// Default: UUID + ext
+		uniqueName = fmt.Sprintf("%s%s", uuid.New().String(), ext)
+	}
 	path := buildFilePath(folder, uniqueName)
 
 	// Upload dengan bucket parameter
@@ -224,7 +234,7 @@ Output sukses:
 Output error:
 - error → gagal init client / network / HeadObject error selain 404
 */
-func (s *SupabaseStorage) Delete(ctx context.Context, path string) error {
+func (s *SupabaseStorage) Delete(ctx context.Context, path string, bucket string) error { // Tambah bucket param
 	client, err := s.getClient()
 	if err != nil {
 		return err
@@ -232,7 +242,7 @@ func (s *SupabaseStorage) Delete(ctx context.Context, path string) error {
 
 	path = sanitizePath(path)
 
-	exists, err := s.Exists(ctx, path)
+	exists, err := s.Exists(ctx, path, bucket)
 	if err != nil {
 		return fmt.Errorf("failed to check file existence: %w", err)
 	}
@@ -242,7 +252,7 @@ func (s *SupabaseStorage) Delete(ctx context.Context, path string) error {
 	}
 
 	_, err = client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(s.config.Bucket),
+		Bucket: aws.String(bucket), // Ganti s.config.Bucket dengan bucket
 		Key:    aws.String(path),
 	})
 	if err != nil {
@@ -263,7 +273,7 @@ Output sukses:
 Output error:
 - (false, error) → kegagalan jaringan / client
 */
-func (s *SupabaseStorage) Exists(ctx context.Context, path string) (bool, error) {
+func (s *SupabaseStorage) Exists(ctx context.Context, path string, bucket string) (bool, error) { // Tambah bucket param
 	client, err := s.getClient()
 	if err != nil {
 		return false, err
@@ -272,7 +282,7 @@ func (s *SupabaseStorage) Exists(ctx context.Context, path string) (bool, error)
 	path = sanitizePath(path)
 
 	_, err = client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(s.config.Bucket),
+		Bucket: aws.String(bucket), // Gunakan bucket param
 		Key:    aws.String(path),
 	})
 	if err != nil {
@@ -292,7 +302,7 @@ Output sukses:
 Output error:
 - error → gagal init client / generate presign
 */
-func (s *SupabaseStorage) GetPresignedURL(ctx context.Context, path string, expiry time.Duration) (string, error) {
+func (s *SupabaseStorage) GetPresignedURL(ctx context.Context, path string, expiry time.Duration, bucket string) (string, error) { // Tambah bucket param
 	client, err := s.getClient()
 	if err != nil {
 		return "", err
@@ -305,7 +315,7 @@ func (s *SupabaseStorage) GetPresignedURL(ctx context.Context, path string, expi
 
 	presignClient := s3.NewPresignClient(client)
 	result, err := presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(s.config.Bucket),
+		Bucket: aws.String(bucket), // Gunakan bucket param
 		Key:    aws.String(path),
 	}, s3.WithPresignExpires(expiry))
 	if err != nil {

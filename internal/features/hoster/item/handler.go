@@ -1,6 +1,7 @@
 package item
 
 import (
+	"encoding/json"
 	"log"
 	"mime/multipart"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"lalan-be/internal/domain"
+	"lalan-be/internal/dto"
 	"lalan-be/internal/message"
 	"lalan-be/internal/middleware"
 	"lalan-be/internal/response"
@@ -218,4 +220,68 @@ func (h *HosterItemHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("DeleteItem handler: deleted item %s for hoster %s", itemID, hosterID)
 	response.OK(w, nil, message.ItemDeleted)
+}
+
+/*
+UpdateItem menangani PUT /api/v1/hoster/items/{id}
+
+Alur kerja:
+1. Validasi method PUT
+2. Ambil hosterID dari JWT context
+3. Ambil itemID dari path param
+4. Parse JSON body ke dto.UpdateItemRequest
+5. Panggil service.UpdateItem
+6. Kembalikan hasil atau error
+
+Output sukses:
+- 200 OK + message success
+Output error:
+- 400 Bad Request (invalid input)
+- 401 Unauthorized
+- 500 Internal Server Error
+*/
+func (h *HosterItemHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		response.MethodNotAllowed(w, message.MethodNotAllowed)
+		return
+	}
+
+	// Ambil hosterID dari middleware
+	hosterID := middleware.GetUserID(r)
+	if hosterID == "" {
+		response.Unauthorized(w, message.Unauthorized)
+		return
+	}
+
+	// Ambil itemID dari path param
+	vars := mux.Vars(r)
+	itemID := vars["id"]
+	if itemID == "" {
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+
+	// Parse JSON body
+	var req dto.UpdateItemRequestRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("UpdateItem: failed to decode JSON: %v", err)
+		response.BadRequest(w, "Invalid JSON")
+		return
+	}
+
+	// Panggil service
+	if err := h.service.UpdateItem(hosterID, itemID, &req); err != nil {
+		log.Printf("UpdateItem: service error hoster=%s item=%s err=%v", hosterID, itemID, err)
+		switch err.Error() {
+		case message.BadRequest:
+			response.BadRequest(w, message.BadRequest)
+		case message.Unauthorized:
+			response.Unauthorized(w, message.Unauthorized)
+		default:
+			response.Error(w, http.StatusInternalServerError, message.InternalError)
+		}
+		return
+	}
+
+	response.OK(w, nil, message.ItemUpdated) // Asumsi ada message.ItemUpdated
 }

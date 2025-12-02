@@ -10,7 +10,7 @@ type PickupMethod string
 
 const (
 	// PickupMethodSelfPickup: Customer ambil sendiri ke lokasi hoster
-	PickupMethodSelfPickup PickupMethod = "pickup"
+	PickupMethodSelfPickup PickupMethod = "self_pickup"
 
 	// PickupMethodDelivery: Hoster kirim ke alamat customer
 	PickupMethodDelivery PickupMethod = "delivery"
@@ -50,4 +50,11 @@ type CreateItemByCustomerRequest struct {
 	Deposit     int          `json:"deposit" db:"deposit"`             // Deposit per unit
 	Discount    int          `json:"discount,omitempty" db:"discount"` // Diskon (opsional)
 	CategoryID  string       `json:"category_id" db:"category_id"`     // FK ke Category
+}
+
+type UpdateItemRequestRequest struct {
+	Stock      *int          `json:"stock,omitempty"`       // Pointer untuk opsional
+	PickupType *PickupMethod `json:"pickup_type,omitempty"` // Gunakan PickupMethod untuk type-safe
+	Deposit    *int          `json:"deposit,omitempty"`
+	Discount   *int          `json:"discount,omitempty"`
 }

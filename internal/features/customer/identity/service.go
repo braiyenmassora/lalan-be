@@ -8,6 +8,7 @@ import (
 	"io"
 	"time"
 
+	"lalan-be/internal/config"
 	"lalan-be/internal/domain"
 	"lalan-be/internal/dto"
 	"lalan-be/internal/utils"
@@ -33,6 +34,7 @@ Tidak boleh ada detail HTTP atau query SQL di sini.
 type IdentityService struct {
 	repo    IdentityRepo
 	storage utils.Storage
+	config  config.StorageConfig
 }
 
 /*
@@ -42,10 +44,11 @@ Dependency injection untuk repo dan storage memudahkan unit testing dan perganti
 Output:
 - *IdentityService yang sudah terkoneksi ke repository dan storage.
 */
-func NewIdentityService(repo IdentityRepo, storage utils.Storage) *IdentityService {
+func NewIdentityService(repo IdentityRepo, storage utils.Storage, cfg config.StorageConfig) *IdentityService {
 	return &IdentityService{
 		repo:    repo,
 		storage: storage,
+		config:  cfg,
 	}
 }
 
@@ -68,26 +71,24 @@ func (s *IdentityService) UploadKTP(ctx context.Context, userID string, file io.
 		return fmt.Errorf("userID required")
 	}
 
-	// Kami tidak menghapus record lama pada upload/re-upload.
-	// Setiap upload harus dianggap sebagai entri baru (insert) supaya
-	// referensi lama masih aman (misalnya booking yang mengacu ke identity lama).
+	// Generate filename: ktp1_DDMMYYYY.jpg
+	now := time.Now()
+	dateStr := now.Format("02122005") // DDMMYYYY
+	filename := fmt.Sprintf("ktp_%s.jpg", dateStr)
+	path := fmt.Sprintf("ktp/%s/%s", userID, filename) // ktp/{userID}/ktp1_02122005.jpg
 
-	// Upload file baru — gunakan nama file unik agar tidak menimpa file lama
-	// di object storage.
-	path := fmt.Sprintf("ktp/%s_%d.jpg", userID, time.Now().UnixNano())
-	newURL, err := s.storage.Upload(ctx, file, path, "image/jpeg")
+	newURL, err := s.storage.Upload(ctx, file, path, "image/jpeg", s.config.CustomerBucket)
 	if err != nil {
 		return fmt.Errorf("failed to upload new ktp: %w", err)
 	}
 
-	// 3. Simpan record baru (status pending)
+	// Simpan record baru
 	req := &dto.UploadIdentityByCustomerRequest{
 		UserID: userID,
 		KTPURL: newURL,
 	}
 	if err := s.repo.UploadKTP(req); err != nil {
-		// Jika DB gagal, coba hapus file yang baru di-upload
-		_ = s.storage.Delete(ctx, newURL)
+		_ = s.storage.Delete(ctx, newURL, s.config.CustomerBucket)
 		return fmt.Errorf("failed to save identity record: %w", err)
 	}
 
@@ -115,22 +116,23 @@ func (s *IdentityService) UpdateKTP(ctx context.Context, userID string, file io.
 		return fmt.Errorf("file is required")
 	}
 
-	// Treat re-upload as new entry → insert new record and keep old ones.
-	// Create a unique path (timestamp based) so file objects are not overwritten.
-	path := fmt.Sprintf("ktp/%s_%d.jpg", userID, time.Now().UnixNano())
-	newURL, err := s.storage.Upload(ctx, file, path, "image/jpeg")
+	// Generate filename dan path sama
+	now := time.Now()
+	dateStr := now.Format("02122005")
+	filename := fmt.Sprintf("ktp1_%s.jpg", dateStr)
+	path := fmt.Sprintf("ktp/%s/%s", userID, filename)
+
+	newURL, err := s.storage.Upload(ctx, file, path, "image/jpeg", s.config.CustomerBucket)
 	if err != nil {
 		return fmt.Errorf("failed to upload ktp: %w", err)
 	}
 
-	// Save as a NEW identity record (insert) — do NOT update or delete old records.
 	req := &dto.UploadIdentityByCustomerRequest{
 		UserID: userID,
 		KTPURL: newURL,
 	}
 	if err := s.repo.UploadKTP(req); err != nil {
-		// Jika DB gagal, coba hapus file yang baru di-upload
-		_ = s.storage.Delete(ctx, newURL)
+		_ = s.storage.Delete(ctx, newURL, s.config.CustomerBucket)
 		return fmt.Errorf("failed to update identity record: %w", err)
 	}
 

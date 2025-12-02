@@ -57,7 +57,7 @@ func main() {
 	// Customer
 	bookingHandler := booking.NewBookingHandler(booking.NewBookingService(booking.NewBookingRepository(dbCfg.DB)))
 	customerIdentityHandler := custidentity.NewIdentityHandler(
-		custidentity.NewIdentityService(custidentity.NewIdentityRepository(dbCfg.DB), storage),
+		custidentity.NewIdentityService(custidentity.NewIdentityRepository(dbCfg.DB), storage, cfg),
 	)
 
 	// Hoster

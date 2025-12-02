@@ -232,7 +232,7 @@ Output error:
 */
 func (r *bookingRepository) GetHosterIDByItemID(itemID string) (string, error) {
 	var hosterID string
-	query := `SELECT user_id FROM item WHERE id = $1`
+	query := `SELECT hoster_id FROM item WHERE id = $1`
 	err := r.db.Get(&hosterID, query, itemID)
 	if err != nil {
 		log.Printf("GetHosterIDByItemID: error querying item %s: %v", itemID, err)
