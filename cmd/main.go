@@ -17,6 +17,8 @@ import (
 	custidentity "lalan-be/internal/features/customer/identity"
 	hosterbooking "lalan-be/internal/features/hoster/booking"
 	hosteritem "lalan-be/internal/features/hoster/item"
+	hosterprofile "lalan-be/internal/features/hoster/profile"
+	hostertnc "lalan-be/internal/features/hoster/tnc"
 	public "lalan-be/internal/features/public"
 	"lalan-be/internal/middleware"
 	"lalan-be/internal/utils"
@@ -62,8 +64,10 @@ func main() {
 	)
 
 	// Hoster
-	hosterHandler := hosterbooking.NewBookingHandler(hosterbooking.NewBookingService(hosterbooking.NewHosterBookingRepository(dbCfg.DB)))
+	hosterHandler := hosterbooking.NewHosterBookingHandler(hosterbooking.NewBookingService(hosterbooking.NewHosterBookingRepository(dbCfg.DB)))
 	hosterItemHandler := hosteritem.NewHosterItemHandler(hosteritem.NewItemService(hosteritem.NewHosterItemRepository(dbCfg.DB), storage, cfg))
+	hosterTnCHandler := hostertnc.NewHosterTnCHandler(hostertnc.NewTnCService(hostertnc.NewTnCRepository(dbCfg.DB)))
+	hosterProfileHandler := hosterprofile.NewHosterProfileHandler(hosterprofile.NewHosterProfileService(hosterprofile.NewHosterProfileRepository(dbCfg.DB)))
 
 	// Admin
 	adminIdentityHandler := adminidentity.NewAdminIdentityHandler(
@@ -89,6 +93,8 @@ func main() {
 	// Hoster
 	hosterbooking.SetupBookingRoutes(router, hosterHandler)
 	hosteritem.SetupItemRoutes(router, hosterItemHandler)
+	hostertnc.SetupTnCRoutes(router, hosterTnCHandler)
+	hosterprofile.SetupProfileRoutes(router, hosterProfileHandler)
 
 	// Admin
 	adminidentity.SetupAdminIdentityRoutes(router, adminIdentityHandler)

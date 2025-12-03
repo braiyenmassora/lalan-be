@@ -22,6 +22,7 @@ Menyediakan operasi read (list) dan create untuk hoster.
 */
 type ItemService interface {
 	GetListItem(hosterID string) ([]dto.ItemListByHosterResponse, error)
+	GetItemDetail(hosterID, itemID string) (*dto.ItemDetailByHosterResponse, error)
 	CreateItem(ctx context.Context, item *domain.Item, photoFiles []*multipart.FileHeader) (*dto.ItemDetailByHosterResponse, error)
 	DeleteItem(hosterID, itemID string) error
 	UpdateItem(hosterID, itemID string, req *dto.UpdateItemRequestRequest) error // Tambah ini
@@ -72,6 +73,39 @@ func (s *itemService) GetListItem(hosterID string) ([]dto.ItemListByHosterRespon
 	}
 
 	return items, nil
+}
+
+/*
+GetItemDetail mengambil detail lengkap satu item milik hoster.
+
+Alur kerja:
+1. Validasi hosterID dan itemID tidak kosong
+2. Panggil repository dengan filter hosterID (memastikan ownership)
+3. Wrap error menjadi NotFound atau InternalError
+
+Output sukses:
+- (*dto.ItemDetailByHosterResponse, nil)
+Output error:
+- (nil, error) → unauthorized / not found / internal error
+*/
+func (s *itemService) GetItemDetail(hosterID, itemID string) (*dto.ItemDetailByHosterResponse, error) {
+	if hosterID == "" {
+		return nil, errors.New(message.Unauthorized)
+	}
+	if itemID == "" {
+		return nil, errors.New(message.BadRequest)
+	}
+
+	detail, err := s.repo.GetItemDetail(hosterID, itemID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New(message.NotFound)
+		}
+		log.Printf("GetItemDetail(hoster service): repo error for hoster %s item %s: %v", hosterID, itemID, err)
+		return nil, errors.New(message.InternalError)
+	}
+
+	return detail, nil
 }
 
 /*

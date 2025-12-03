@@ -9,6 +9,7 @@ import (
 	"lalan-be/internal/dto"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 /*
@@ -279,24 +280,56 @@ func (r *bookingRepository) GetBookingDetail(bookingID string) (*dto.BookingDeta
 		return nil, err
 	}
 
-	// Hitung waktu tersisa
+	// Hitung waktu tersisa (hanya untuk status pending)
 	now := time.Now()
-	if booking.LockedUntil.After(now) {
+	if booking.Status == "pending" && booking.LockedUntil.After(now) {
 		booking.TimeRemainingMinutes = int(booking.LockedUntil.Sub(now).Minutes())
 	} else {
 		booking.TimeRemainingMinutes = 0
+		// Clear locked_until jika bukan pending
+		if booking.Status != "pending" {
+			booking.LockedUntil = time.Time{}
+		}
 	}
 
 	// 2. Get Booking Items
-	var items []domain.BookingItem
 	queryItems := `
-		SELECT id, booking_id, item_id, name, quantity, price_per_day, deposit_per_unit,
-		       subtotal_rental, subtotal_deposit
-		FROM booking_item WHERE booking_id = $1
+		SELECT 
+			bi.id, bi.booking_id, bi.item_id, bi.name, bi.quantity, 
+			bi.price_per_day, bi.deposit_per_unit, bi.subtotal_rental, bi.subtotal_deposit,
+			COALESCE(i.description, '') AS description,
+			CASE 
+				WHEN i.photos IS NOT NULL THEN 
+					ARRAY(SELECT jsonb_array_elements_text(i.photos))
+				ELSE ARRAY[]::text[]
+			END AS photos
+		FROM booking_item bi
+		LEFT JOIN item i ON bi.item_id = i.id
+		WHERE bi.booking_id = $1
 	`
-	err = r.db.Select(&items, queryItems, bookingID)
+	rows, err := r.db.Query(queryItems, bookingID)
 	if err != nil {
 		log.Printf("GetBookingDetail: error querying items for booking %s: %v", bookingID, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []domain.BookingItem
+	for rows.Next() {
+		var item domain.BookingItem
+		err := rows.Scan(
+			&item.ID, &item.BookingID, &item.ItemID, &item.Name, &item.Quantity,
+			&item.PricePerDay, &item.DepositPerUnit, &item.SubtotalRental, &item.SubtotalDeposit,
+			&item.Description, pq.Array(&item.Photos),
+		)
+		if err != nil {
+			log.Printf("GetBookingDetail: error scanning item row: %v", err)
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	if err = rows.Err(); err != nil {
+		log.Printf("GetBookingDetail: error iterating items: %v", err)
 		return nil, err
 	}
 
@@ -346,14 +379,22 @@ func (r *bookingRepository) GetBookingDetail(bookingID string) (*dto.BookingDeta
 		customerResponse.Status = identity.Status
 		customerResponse.Reason = identity.Reason
 		customerResponse.UploadedAt = &identity.CreatedAt
+		if identity.VerifiedAt != nil && !identity.VerifiedAt.IsZero() {
+			customerResponse.VerifiedAt = identity.VerifiedAt
+		}
 	}
 
 	// Mapping Booking Header
+	var lockedUntilPtr *time.Time
+	if booking.Status == "pending" && !booking.LockedUntil.IsZero() {
+		lockedUntilPtr = &booking.LockedUntil
+	}
+
 	bookingResponse := dto.BookingInfoResponse{
 		ID:                   booking.ID,
 		HosterID:             booking.HosterID,
 		UserID:               booking.UserID,
-		IdentityID:           booking.IdentityID,
+		KTPID:                booking.IdentityID,
 		StartDate:            booking.StartDate,
 		EndDate:              booking.EndDate,
 		TotalDays:            booking.TotalDays,
@@ -364,7 +405,7 @@ func (r *bookingRepository) GetBookingDetail(bookingID string) (*dto.BookingDeta
 		Total:                booking.Total,
 		Outstanding:          booking.Outstanding,
 		Status:               booking.Status,
-		LockedUntil:          &booking.LockedUntil,
+		LockedUntil:          lockedUntilPtr,
 		TimeRemainingMinutes: booking.TimeRemainingMinutes,
 		CreatedAt:            booking.CreatedAt,
 		UpdatedAt:            booking.UpdatedAt,
@@ -378,6 +419,8 @@ func (r *bookingRepository) GetBookingDetail(bookingID string) (*dto.BookingDeta
 			BookingID:       item.BookingID,
 			ItemID:          item.ItemID,
 			Name:            item.Name,
+			Description:     item.Description,
+			Photos:          item.Photos,
 			Quantity:        item.Quantity,
 			PricePerDay:     item.PricePerDay,
 			DepositPerUnit:  item.DepositPerUnit,

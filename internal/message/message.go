@@ -22,10 +22,11 @@ const (
 	UploadFailed  = "failed to upload %s"
 
 	// ITEM
-	ItemCreated  = "item created"
-	ItemUpdated  = "item updated"
-	ItemDeleted  = "item deleted"
-	ItemNotFound = "item not found"
+	ItemCreated   = "item created"
+	ItemUpdated   = "item updated"
+	ItemDeleted   = "item deleted"
+	ItemNotFound  = "item not found"
+	ItemRetrieved = "item retrieved successfully"
 
 	// Authentication & Authorization
 	LoginFailed            = "invalid email or password"
@@ -54,6 +55,7 @@ const (
 	BookingAlreadyCancelled = "booking already cancelled"
 	BookingNotCancellable   = "booking cannot be cancelled"
 	BookingOverlap          = "booking time overlaps"
+	BookingStatusUpdated    = "booking status updated successfully"
 
 	// KTP
 	KTPUploaded                = "KTP uploaded successfully"
@@ -87,4 +89,15 @@ const (
 	ResetTokenSent        = "reset password token sent"
 	ResetTokenInvalid     = "invalid or expired reset token"
 	PasswordResetSuccess  = "password reset successfully"
+
+	// PROFILE
+	ProfileRetrieved = "profile retrieved successfully"
+	ProfileUpdated   = "profile updated successfully"
+	ProfileNotFound  = "profile not found"
+
+	// TERMS AND CONDITIONS (TnC)
+	TnCCreated   = "terms and conditions created successfully"
+	TnCUpdated   = "terms and conditions updated successfully"
+	TnCRetrieved = "terms and conditions retrieved successfully"
+	TnCNotFound  = "terms and conditions not found"
 )

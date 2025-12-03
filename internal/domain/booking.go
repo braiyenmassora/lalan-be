@@ -64,15 +64,17 @@ type Booking struct {
 // - BookingItem belongs to Booking
 // - BookingItem references Item (item_id) tapi simpan snapshot data untuk history
 type BookingItem struct {
-	ID              string `json:"id" db:"id"`
-	BookingID       string `json:"booking_id" db:"booking_id"`
-	ItemID          string `json:"item_id" db:"item_id"`                   // ID item asli (untuk tracking)
-	Name            string `json:"name" db:"name"`                         // Snapshot nama item saat booking dibuat
-	Quantity        int    `json:"quantity" db:"quantity"`                 // Jumlah unit yang disewa
-	PricePerDay     int    `json:"price_per_day" db:"price_per_day"`       // Snapshot harga per hari
-	DepositPerUnit  int    `json:"deposit_per_unit" db:"deposit_per_unit"` // Snapshot deposit per unit
-	SubtotalRental  int    `json:"subtotal_rental" db:"subtotal_rental"`   // quantity × price_per_day × total_days
-	SubtotalDeposit int    `json:"subtotal_deposit" db:"subtotal_deposit"` // quantity × deposit_per_unit
+	ID              string   `json:"id" db:"id"`
+	BookingID       string   `json:"booking_id" db:"booking_id"`
+	ItemID          string   `json:"item_id" db:"item_id"`                   // ID item asli (untuk tracking)
+	Name            string   `json:"name" db:"name"`                         // Snapshot nama item saat booking dibuat
+	Description     string   `json:"description" db:"description"`           // Enriched dari item table (bukan snapshot)
+	Photos          []string `json:"photos" db:"photos"`                     // Enriched dari item table (bukan snapshot)
+	Quantity        int      `json:"quantity" db:"quantity"`                 // Jumlah unit yang disewa
+	PricePerDay     int      `json:"price_per_day" db:"price_per_day"`       // Snapshot harga per hari
+	DepositPerUnit  int      `json:"deposit_per_unit" db:"deposit_per_unit"` // Snapshot deposit per unit
+	SubtotalRental  int      `json:"subtotal_rental" db:"subtotal_rental"`   // quantity × price_per_day × total_days
+	SubtotalDeposit int      `json:"subtotal_deposit" db:"subtotal_deposit"` // quantity × deposit_per_unit
 }
 
 // ===================================================================

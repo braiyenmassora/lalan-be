@@ -6,6 +6,8 @@ import (
 
 	"lalan-be/internal/message"
 	"lalan-be/internal/response"
+
+	"github.com/gorilla/mux"
 )
 
 /*
@@ -107,6 +109,55 @@ func (h *PublicHandler) GetAllTermsAndConditions(w http.ResponseWriter, r *http.
 	}
 
 	response.OK(w, tacs, message.Success)
+}
+
+/*
+GetItemDetail menangani endpoint GET /public/item/{id}.
+
+Alur kerja:
+1. Validasi method HTTP
+2. Ambil ID item dari URL path parameter
+3. Panggil service untuk ambil detail lengkap item (dengan JOIN)
+4. Return data atau error sesuai kondisi
+
+Output sukses:
+- 200 OK + detail lengkap (item, category, hoster, tnc)
+Output error:
+- 405 Method Not Allowed
+- 404 Not Found jika item tidak ditemukan
+- 500 Internal Server Error jika service error
+*/
+func (h *PublicHandler) GetItemDetail(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GetItemDetail: request from %s", r.RemoteAddr)
+
+	if r.Method != http.MethodGet {
+		response.MethodNotAllowed(w, message.MethodNotAllowed)
+		return
+	}
+
+	// Get item ID from URL path parameter
+	vars := mux.Vars(r)
+	itemID := vars["id"]
+
+	if itemID == "" {
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+
+	itemDetail, err := h.service.GetItemDetail(itemID)
+	if err != nil {
+		log.Printf("GetItemDetail: service error: %v", err)
+
+		if err.Error() == message.ItemNotFound {
+			response.NotFound(w, message.ItemNotFound)
+			return
+		}
+
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
+		return
+	}
+
+	response.OK(w, itemDetail, message.ItemRetrieved)
 }
 
 /*

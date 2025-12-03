@@ -120,6 +120,33 @@ func (s *publicService) GetAllTermsAndConditions() ([]dto.TermsAndConditionsPubl
 }
 
 /*
+GetItemDetail mengambil detail lengkap item dengan JOIN.
+
+Parameter:
+- itemID: UUID item yang ingin diambil
+
+Langkah:
+1. Panggil repository untuk ambil data JOIN (sudah dalam format DTO)
+2. Return langsung karena repository sudah mapping ke DTO
+
+Output:
+- (*dto.ItemDetailResponse, nil) jika sukses
+- (nil, message.ItemNotFound) jika item tidak ditemukan
+- (nil, message.InternalError) jika terjadi kesalahan internal
+*/
+func (s *publicService) GetItemDetail(itemID string) (*dto.ItemDetailResponse, error) {
+	itemDetail, err := s.repo.GetItemDetail(itemID)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return nil, errors.New(message.ItemNotFound)
+		}
+		return nil, errors.New(message.InternalError)
+	}
+
+	return itemDetail, nil
+}
+
+/*
 PublicService adalah kontrak untuk logika bisnis fitur publik.
 Digunakan oleh handler untuk dependency injection.
 */
@@ -127,6 +154,7 @@ type PublicService interface {
 	GetAllCategory() ([]dto.CategoryPublicResponse, error)
 	GetAllItems() ([]dto.ItemPublicResponse, error)
 	GetAllTermsAndConditions() ([]dto.TermsAndConditionsPublicResponse, error)
+	GetItemDetail(itemID string) (*dto.ItemDetailResponse, error)
 }
 
 /*

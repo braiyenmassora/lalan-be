@@ -90,3 +90,64 @@ type TermsAndConditionsPublicResponse struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 	UserID      string    `json:"user_id"`
 }
+
+// ===================================================================
+// ITEM DETAIL WITH JOIN - PUBLIC
+// ===================================================================
+
+// ItemDetailResponse adalah response lengkap untuk detail item dengan JOIN
+// Endpoint: GET /public/item/{id}
+// Menggabungkan data item, category, hoster, dan terms & conditions dalam 1 response
+//
+// Contoh JSON:
+//
+//	{
+//	  "item": {...},
+//	  "category": {...},
+//	  "hoster": {...},
+//	  "terms_and_conditions": [...],
+//	  "booked_dates": ["2025-12-05", "2025-12-06", "2025-12-07"]
+//	}
+type ItemDetailResponse struct {
+	Item               ItemDetail     `json:"item"`
+	Category           CategoryDetail `json:"category"`
+	Hoster             HosterDetail   `json:"hoster"`
+	TermsAndConditions []string       `json:"terms_and_conditions"`
+	BookedDates        []string       `json:"booked_dates"`
+}
+
+// ItemDetail adalah detail item untuk response detail
+type ItemDetail struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Photos      []string  `json:"photos"`
+	Stock       int       `json:"stock"`
+	PickupType  string    `json:"pickup_type"`
+	PricePerDay int       `json:"price_per_day"`
+	Deposit     int       `json:"deposit"`
+	Discount    int       `json:"discount,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// CategoryDetail adalah detail kategori untuk response detail
+type CategoryDetail struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// HosterDetail adalah detail hoster (pemilik item) untuk response detail
+type HosterDetail struct {
+	ID           string `json:"id"`
+	FullName     string `json:"full_name"`
+	StoreName    string `json:"store_name"`
+	Description  string `json:"description"`
+	PhoneNumber  string `json:"phone_number"`
+	Address      string `json:"address"`
+	ProfilePhoto string `json:"profile_photo,omitempty"`
+	Website      string `json:"website,omitempty"`
+	Instagram    string `json:"instagram,omitempty"`
+	Tiktok       string `json:"tiktok,omitempty"`
+}

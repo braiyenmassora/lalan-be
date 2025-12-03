@@ -28,35 +28,39 @@ go mod download
 Set up `.env.dev`:
 
 ```bash
-# Application Environment
+# App base
 APP_ENV=
 APP_PORT=
 
-# Database Configuration (Supabase Pooler)
-DB_HOST=
-DB_NAME=
-DB_PASSWORD=
-DB_PORT=
-DB_USER=
-DB_SSL_MODE=
-
-# JWT Configuration - IMPORTANT: Without quotes!
+# JWT
 JWT_SECRET=
 
-# Redis Configuration (currently commented out in code)
+# Redis
 REDIS_URL=
 
-# CORS Configuration (optional, defaults to *)
-# ALLOWED_ORIGIN=
+# CORS
+ALLOWED_ORIGIN_DEV=
+ALLOWED_ORIGIN_STAGING=
 
-# Supabase Storage
+# Database
+DB_HOST=
+DB_NAME=
+DB_USER=
+DB_PASSWORD=
+DB_PORT=
+
+# Storage
 STORAGE_ACCESS_KEY=
 STORAGE_SECRET_KEY=
 STORAGE_ENDPOINT=
 STORAGE_REGION=
-STORAGE_BUCKET=
 STORAGE_PROJECT_ID=
 STORAGE_DOMAIN=
+
+# hoster
+STORAGE_CUSTOMER_BUCKET=
+STORAGE_HOSTER_BUCKET=
+
 ```
 
 Start the server:
