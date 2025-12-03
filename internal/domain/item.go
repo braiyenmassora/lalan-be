@@ -17,7 +17,7 @@ type PickupMethod string
 
 const (
 	// PickupMethodSelfPickup: Customer ambil sendiri ke lokasi hoster
-	PickupMethodSelfPickup PickupMethod = "pickup"
+	PickupMethodSelfPickup PickupMethod = "self_pickup"
 
 	// PickupMethodDelivery: Hoster kirim ke alamat customer
 	PickupMethodDelivery PickupMethod = "delivery"

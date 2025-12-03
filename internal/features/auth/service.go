@@ -96,49 +96,6 @@ func (s *authService) generateOTP() string {
 }
 
 /*
-RegisterCustomer mendaftarkan customer baru.
-
-Langkah-langkah:
-1. Hash password menggunakan bcrypt.
-2. Generate OTP 6 digit.
-3. Set waktu kadaluarsa OTP (5 menit).
-4. Simpan data customer ke database.
-
-Output:
-- Pointer ke CreateCustomerResponse jika berhasil.
-- error jika email sudah ada atau terjadi kesalahan sistem.
-*/
-func (s *authService) RegisterCustomer(c *domain.Customer) (*dto.CreateCustomerResponse, error) {
-	// 1. Hash password
-	hash, err := bcrypt.GenerateFromPassword([]byte(c.PasswordHash), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, errors.New(message.InternalError)
-	}
-	c.PasswordHash = string(hash)
-
-	// 2. Generate OTP & Expiry
-	otp := s.generateOTP()
-	c.EmailVerified = false
-	c.VerificationToken = otp
-	exp := time.Now().Add(5 * time.Minute)
-	c.VerificationExpiresAt = &exp
-	c.CreatedAt = time.Now()
-	c.UpdatedAt = time.Now()
-
-	// 3. Simpan ke database
-	if err := s.repo.CreateCustomer(c); err != nil {
-		if err.Error() == "email already exists" {
-			return nil, errors.New(message.EmailAlreadyExists)
-		}
-		return nil, errors.New(message.InternalError)
-	}
-
-	// TODO: Kirim email OTP menggunakan layanan email (SendGrid/Mailgun/dll)
-
-	return &dto.CreateCustomerResponse{CustomerID: c.ID, OTP: otp}, nil
-}
-
-/*
 RegisterHoster mendaftarkan hoster baru.
 
 Langkah-langkah:
@@ -159,6 +116,9 @@ func (s *authService) RegisterHoster(h *domain.Hoster) error {
 	h.UpdatedAt = time.Now()
 
 	if err := s.repo.CreateHoster(h); err != nil {
+		if err.Error() == "email already exists" {
+			return errors.New(message.EmailAlreadyExists)
+		}
 		return errors.New(message.InternalError)
 	}
 	return nil
@@ -186,10 +146,48 @@ func (s *authService) RegisterAdmin(a *domain.Admin) error {
 
 	if err := s.repo.CreateAdmin(a); err != nil {
 		if err.Error() == "duplicate" {
-			return errors.New(message.AlreadyExists)
+			return errors.New(message.EmailAlreadyExists)
 		}
 		return errors.New(message.InternalError)
 	}
+	return nil
+}
+
+/*
+RegisterCustomer mendaftarkan customer baru.
+
+Langkah-langkah:
+1. Hash password.
+2. Generate OTP dan set expiry.
+3. Simpan data customer ke database.
+
+Output:
+- error jika email duplikat atau kesalahan sistem.
+- nil jika berhasil.
+*/
+func (s *authService) RegisterCustomer(c *domain.Customer) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(c.PasswordHash), bcrypt.DefaultCost)
+	if err != nil {
+		return errors.New(message.InternalError)
+	}
+	c.PasswordHash = string(hash)
+	c.CreatedAt = time.Now()
+	c.UpdatedAt = time.Now()
+
+	// Generate OTP untuk verifikasi email
+	otp := s.generateOTP()
+	c.VerificationToken = otp
+	c.VerificationExpiresAt = time.Now().Add(5 * time.Minute)
+
+	if err := s.repo.CreateCustomer(c); err != nil {
+		if err.Error() == "email already exists" {
+			return errors.New(message.EmailAlreadyExists)
+		}
+		return errors.New(message.InternalError)
+	}
+
+	// TODO: Kirim email OTP untuk verifikasi
+
 	return nil
 }
 
@@ -202,7 +200,7 @@ Output:
 */
 func (s *authService) SendOTP(email string, otp string) error {
 	if err := s.repo.SendOTP(email, otp); err != nil {
-		if err.Error() == "invalid or expired OTP" {
+		if err.Error() == message.OTPInvalid {
 			return errors.New(message.OTPInvalid)
 		}
 		return errors.New(message.InternalError)
@@ -215,20 +213,23 @@ ResendOTP mengirim ulang kode OTP baru.
 
 Langkah-langkah:
 1. Generate OTP baru.
-2. Update database dengan OTP baru dan expiry time baru.
+2. Update database dengan OTP baru dan expiry time baru (hanya jika belum verified).
 3. (TODO) Kirim email.
 
 Output:
 - String OTP baru (untuk keperluan dev/testing).
-- error jika customer tidak ditemukan.
+- error jika customer tidak ditemukan atau sudah verified.
 */
 func (s *authService) ResendOTP(email string) (string, error) {
 	newOTP := s.generateOTP()
 	exp := time.Now().Add(5 * time.Minute)
 
 	if err := s.repo.ResendOTP(email, newOTP, exp); err != nil {
-		if err.Error() == "customer not found" {
-			return "", errors.New(message.NotFound)
+		if err.Error() == message.CustomerNotFound {
+			return "", errors.New(message.CustomerNotFound)
+		}
+		if err.Error() == message.OTPAlreadyVerified {
+			return "", errors.New(message.OTPAlreadyVerified)
 		}
 		return "", errors.New(message.InternalError)
 	}
@@ -263,7 +264,7 @@ func (s *authService) Login(email, password string) (*dto.AuthResponse, error) {
 
 	// 2. Cek verifikasi email (khusus customer)
 	if user.Role == "customer" && !user.EmailVerified {
-		return nil, errors.New("Email belum diverifikasi. Silakan verifikasi email terlebih dahulu.")
+		return nil, errors.New(message.EmailNotVerified)
 	}
 
 	// 3. Verifikasi password
@@ -273,4 +274,63 @@ func (s *authService) Login(email, password string) (*dto.AuthResponse, error) {
 
 	// 4. Generate token
 	return s.generateToken(user.ID, user.Role)
+}
+
+/*
+ForgotPassword generates reset token dan kirim via email.
+
+Output:
+- String reset token (untuk dev/testing).
+- error jika user tidak ditemukan.
+*/
+func (s *authService) ForgotPassword(email, role string) (string, error) {
+	// Validasi role
+	if role != "customer" && role != "hoster" {
+		return "", errors.New("invalid role")
+	}
+
+	// Generate reset token
+	resetToken := s.generateOTP()
+	exp := time.Now().Add(15 * time.Minute)
+
+	if err := s.repo.RequestPasswordReset(email, role, resetToken, exp); err != nil {
+		if err.Error() == message.CustomerNotFound || err.Error() == message.HosterNotFound {
+			return "", err
+		}
+		return "", errors.New(message.InternalError)
+	}
+
+	// TODO: Kirim email reset token
+
+	return resetToken, nil
+}
+
+/*
+ResetPassword verifikasi reset token dan update password baru.
+
+Output:
+- error jika token invalid/expired atau update gagal.
+- nil jika berhasil.
+*/
+func (s *authService) ResetPassword(email, role, token, newPassword string) error {
+	// Validasi role
+	if role != "customer" && role != "hoster" {
+		return errors.New("invalid role")
+	}
+
+	// Hash password baru
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return errors.New(message.InternalError)
+	}
+
+	// Update password
+	if err := s.repo.ResetPassword(email, role, token, string(hash)); err != nil {
+		if err.Error() == message.ResetTokenInvalid {
+			return errors.New(message.ResetTokenInvalid)
+		}
+		return errors.New(message.InternalError)
+	}
+
+	return nil
 }

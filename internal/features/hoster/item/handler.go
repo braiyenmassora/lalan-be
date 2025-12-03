@@ -3,17 +3,18 @@ package item
 import (
 	"encoding/json"
 	"log"
+	"mime/multipart"
 	"net/http"
-	"time"
+	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 
 	"lalan-be/internal/domain"
+	"lalan-be/internal/dto"
 	"lalan-be/internal/message"
 	"lalan-be/internal/middleware"
 	"lalan-be/internal/response"
-
-	"github.com/google/uuid"
 )
 
 /*
@@ -70,44 +71,99 @@ func (h *HosterItemHandler) GetListItem(w http.ResponseWriter, r *http.Request) 
 }
 
 /*
-CreateItem menangani POST /api/v1/hoster/items
+CreateItem menangani POST /api/v1/hoster/items dengan support upload photos
 
 Alur kerja:
 1. Validasi method POST
-2. Ambil hosterID dari JWT context
-3. Decode body -> domain.Item, set id/user/timestamps
-4. Panggil service.CreateItem
-5. Kembalikan hasil atau error yang sesuai
+2. Parse multipart form
+3. Ambil hosterID dari JWT context
+4. Parse form fields dan files
+5. Build domain.Item
+6. Panggil service.CreateItem dengan ctx, item, dan photoFiles
+7. Kembalikan hasil atau error
 */
 func (h *HosterItemHandler) CreateItem(w http.ResponseWriter, r *http.Request) {
+	log.Printf("CreateItem: received request")
 	if r.Method != http.MethodPost {
-		response.BadRequest(w, message.MethodNotAllowed)
+		response.MethodNotAllowed(w, message.MethodNotAllowed)
 		return
 	}
 
+	// Parse multipart form
+	err := r.ParseMultipartForm(10 << 20) // Max 10MB total
+	if err != nil {
+		log.Printf("CreateItem: failed to parse multipart: %v", err)
+		response.BadRequest(w, "Invalid form data")
+		return
+	}
+
+	// Ambil hosterID dari middleware
 	hosterID := middleware.GetUserID(r)
 	if hosterID == "" {
 		response.Unauthorized(w, message.Unauthorized)
 		return
 	}
 
-	var req domain.Item
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("CreateItem handler: invalid request body hoster=%s err=%v", hosterID, err)
-		response.BadRequest(w, message.BadRequest)
+	// Parse form fields
+	name := r.FormValue("name")
+	description := r.FormValue("description")
+	stockStr := r.FormValue("stock")
+	pricePerDayStr := r.FormValue("price_per_day")
+	depositStr := r.FormValue("deposit")
+	pickupType := r.FormValue("pickup_type")
+	categoryID := r.FormValue("category_id")
+	discountStr := r.FormValue("discount")
+
+	// Convert dan validasi
+	stock, err := strconv.Atoi(stockStr)
+	if err != nil || stock < 0 {
+		response.BadRequest(w, "Invalid stock")
 		return
 	}
+	pricePerDay, err := strconv.Atoi(pricePerDayStr)
+	if err != nil || pricePerDay <= 0 {
+		response.BadRequest(w, "Invalid price_per_day")
+		return
+	}
+	deposit, err := strconv.Atoi(depositStr)
+	if err != nil || deposit < 0 {
+		response.BadRequest(w, "Invalid deposit")
+		return
+	}
+	discount := 0
+	if discountStr != "" {
+		discount, err = strconv.Atoi(discountStr)
+		if err != nil || discount < 0 {
+			response.BadRequest(w, "Invalid discount")
+			return
+		}
+	}
 
-	// set required server-side fields
-	req.HosterID = hosterID
-	req.ID = uuid.New().String()
-	now := time.Now().UTC()
-	req.CreatedAt = now
-	req.UpdatedAt = now
+	// Parse photo files
+	files := r.MultipartForm.File["photos"]
+	var photoFiles []*multipart.FileHeader
+	for _, fileHeader := range files {
+		photoFiles = append(photoFiles, fileHeader)
+	}
 
-	created, err := h.service.CreateItem(&req)
+	// Build item
+	item := &domain.Item{
+		ID:          uuid.New().String(),
+		HosterID:    hosterID,
+		Name:        name,
+		Description: description,
+		Stock:       stock,
+		PickupType:  domain.PickupMethod(pickupType),
+		PricePerDay: pricePerDay,
+		Deposit:     deposit,
+		Discount:    discount,
+		CategoryID:  categoryID,
+	}
+
+	// Panggil service
+	detail, err := h.service.CreateItem(r.Context(), item, photoFiles)
 	if err != nil {
-		log.Printf("CreateItem handler: service error hoster=%s err=%v", hosterID, err)
+		log.Printf("CreateItem: service error: %v", err)
 		switch err.Error() {
 		case message.BadRequest:
 			response.BadRequest(w, message.BadRequest)
@@ -119,17 +175,19 @@ func (h *HosterItemHandler) CreateItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.OK(w, created, message.ItemCreated)
+	response.OK(w, detail, message.ItemCreated)
 }
 
-// DeleteItem menangani DELETE /api/v1/hoster/item/{id}
-// - client hanya perlu mengirim path param "id" (item id)
-// - hoster id diambil dari JWT/session (middleware) => tidak perlu dikirim di body
-// Responses:
-//   - 401 Unauthorized -> jika tidak authenticated
-//   - 400 Bad Request -> jika input tidak valid atau item tidak ditemukan / bukan milik hoster
-//   - 204 No Content -> jika sukses
-//   - 500 Internal Server Error -> jika terjadi error internal
+/*
+DeleteItem menangani DELETE /api/v1/hoster/item/{id}
+- client hanya perlu mengirim path param "id" (item id)
+- hoster id diambil dari JWT/session (middleware) => tidak perlu dikirim di body
+Responses:
+  - 401 Unauthorized -> jika tidak authenticated
+  - 400 Bad Request -> jika input tidak valid atau item tidak ada / bukan milik hoster
+  - 204 No Content -> jika sukses
+  - 500 Internal Server Error -> jika terjadi error internal
+*/
 func (h *HosterItemHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	hosterID := middleware.GetUserID(r)
 	vars := mux.Vars(r)
@@ -161,6 +219,69 @@ func (h *HosterItemHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("DeleteItem handler: deleted item %s for hoster %s", itemID, hosterID)
-	// return JSON body with code/message/success for clients (Postman)
 	response.OK(w, nil, message.ItemDeleted)
+}
+
+/*
+UpdateItem menangani PUT /api/v1/hoster/items/{id}
+
+Alur kerja:
+1. Validasi method PUT
+2. Ambil hosterID dari JWT context
+3. Ambil itemID dari path param
+4. Parse JSON body ke dto.UpdateItemRequest
+5. Panggil service.UpdateItem
+6. Kembalikan hasil atau error
+
+Output sukses:
+- 200 OK + message success
+Output error:
+- 400 Bad Request (invalid input)
+- 401 Unauthorized
+- 500 Internal Server Error
+*/
+func (h *HosterItemHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		response.MethodNotAllowed(w, message.MethodNotAllowed)
+		return
+	}
+
+	// Ambil hosterID dari middleware
+	hosterID := middleware.GetUserID(r)
+	if hosterID == "" {
+		response.Unauthorized(w, message.Unauthorized)
+		return
+	}
+
+	// Ambil itemID dari path param
+	vars := mux.Vars(r)
+	itemID := vars["id"]
+	if itemID == "" {
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+
+	// Parse JSON body
+	var req dto.UpdateItemRequestRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("UpdateItem: failed to decode JSON: %v", err)
+		response.BadRequest(w, "Invalid JSON")
+		return
+	}
+
+	// Panggil service
+	if err := h.service.UpdateItem(hosterID, itemID, &req); err != nil {
+		log.Printf("UpdateItem: service error hoster=%s item=%s err=%v", hosterID, itemID, err)
+		switch err.Error() {
+		case message.BadRequest:
+			response.BadRequest(w, message.BadRequest)
+		case message.Unauthorized:
+			response.Unauthorized(w, message.Unauthorized)
+		default:
+			response.Error(w, http.StatusInternalServerError, message.InternalError)
+		}
+		return
+	}
+
+	response.OK(w, nil, message.ItemUpdated) // Asumsi ada message.ItemUpdated
 }

@@ -10,10 +10,11 @@ Response adalah format standar JSON yang digunakan oleh seluruh API.
 Semua response (sukses/error) harus mengikuti struktur ini agar frontend konsisten.
 */
 type Response struct {
-	Code    int    `json:"code"`           // HTTP status code
-	Data    any    `json:"data,omitempty"` // Payload (hanya ada jika success)
-	Message string `json:"message"`        // Pesan untuk user / developer
-	Success bool   `json:"success"`        // true = sukses, false = error
+	Code         int    `json:"code"`                    // HTTP status code
+	Data         any    `json:"data,omitempty"`          // Payload (hanya ada jika success)
+	Message      string `json:"message"`                 // Pesan untuk user / developer
+	Success      bool   `json:"success"`                 // true = sukses, false = error
+	ErrorDetails any    `json:"error_details,omitempty"` // Detail error tambahan (optional)
 }
 
 /*
@@ -38,6 +39,22 @@ func BadRequest(w http.ResponseWriter, msg string) {
 		Code:    http.StatusBadRequest,
 		Message: msg,
 		Success: false,
+	})
+}
+
+/*
+BadRequestWithDetails mengembalikan response 400 Bad Request dengan detail tambahan.
+
+Output:
+- Status: 400
+- Body: { "code": 400, "message": msg, "error_details": details, "success": false }
+*/
+func BadRequestWithDetails(w http.ResponseWriter, msg string, details any) {
+	writeJSON(w, http.StatusBadRequest, Response{
+		Code:         http.StatusBadRequest,
+		Message:      msg,
+		ErrorDetails: details,
+		Success:      false,
 	})
 }
 

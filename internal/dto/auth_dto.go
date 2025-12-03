@@ -92,6 +92,38 @@ type ResendOTPRequest struct {
 	Email string `json:"email"`
 }
 
+// ForgotPasswordRequest adalah payload untuk endpoint POST /auth/forgot-password
+// Digunakan customer dan hoster untuk request reset password
+//
+// Contoh JSON:
+//
+//	{
+//	  "email": "user@example.com",
+//	  "role": "customer"
+//	}
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
+	Role  string `json:"role"` // "customer" atau "hoster"
+}
+
+// ResetPasswordRequest adalah payload untuk endpoint POST /auth/reset-password
+// Digunakan untuk reset password dengan token yang dikirim via email
+//
+// Contoh JSON:
+//
+//	{
+//	  "email": "user@example.com",
+//	  "role": "customer",
+//	  "token": "123456",
+//	  "new_password": "newpassword123"
+//	}
+type ResetPasswordRequest struct {
+	Email       string `json:"email"`
+	Role        string `json:"role"` // "customer" atau "hoster"
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}
+
 // ===================================================================
 // RESPONSE DTO
 // ===================================================================

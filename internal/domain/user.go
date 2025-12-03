@@ -53,16 +53,16 @@ type Hoster struct {
 // Customer adalah entity untuk user yang melakukan booking/sewa item.
 // Customer wajib verifikasi email dan upload KTP sebelum bisa booking.
 type Customer struct {
-	ID                    string     `json:"id" db:"id"`
-	FullName              string     `json:"full_name" db:"full_name"`
-	ProfilePhoto          string     `json:"profile_photo,omitempty" db:"profile_photo"`
-	PhoneNumber           string     `json:"phone_number,omitempty" db:"phone_number"`
-	Email                 string     `json:"email" db:"email"`
-	Address               string     `json:"address,omitempty" db:"address"`
-	PasswordHash          string     `json:"-" db:"password_hash"`
-	EmailVerified         bool       `json:"email_verified" db:"email_verified"`
-	VerificationToken     string     `json:"-" db:"verification_token"`
-	VerificationExpiresAt *time.Time `json:"-" db:"verification_expire"`
-	CreatedAt             time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt             time.Time  `json:"updated_at" db:"updated_at"`
+	ID                    string    `json:"id" db:"id"`
+	FullName              string    `json:"full_name" db:"full_name"`
+	ProfilePhoto          string    `json:"profile_photo,omitempty" db:"profile_photo"`
+	PhoneNumber           string    `json:"phone_number,omitempty" db:"phone_number"`
+	Email                 string    `json:"email" db:"email"`
+	Address               string    `json:"address,omitempty" db:"address"`
+	PasswordHash          string    `json:"-" db:"password_hash"`
+	EmailVerified         bool      `json:"email_verified" db:"email_verified"`
+	VerificationToken     string    `json:"-" db:"verification_token"`
+	VerificationExpiresAt time.Time `json:"-" db:"verification_expire"`
+	CreatedAt             time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt             time.Time `json:"updated_at" db:"updated_at"`
 }

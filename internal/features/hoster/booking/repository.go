@@ -86,37 +86,35 @@ func (r *hosterBookingRepository) GetListBookings(hosterID string) ([]dto.Bookin
 }
 
 // GetCustomerList mengambil daftar pelanggan yang melakukan pemesanan pada hoster tertentu.
-// Query akan memilih snapshot dari booking_customer jika tersedia, dan akan mencoba
-// menambahkan data KTP/identity jika ada untuk user yang sama. Hasil dikembalikan
-// unik per user (booking.user_id).
+// Query akan memilih snapshot dari booking_customer jika tersedia, dan akan mencari
+// KTP terbaru per customer. Hasil dikembalikan unik per user (booking.user_id).
 func (r *hosterBookingRepository) GetCustomerList(hosterID string) ([]dto.CustomerListByHosterResponse, error) {
 	query := `
 		SELECT DISTINCT ON (b.user_id)
-			-- Prioritize booking_customer snapshot ID when available
-			COALESCE(bc.id::text, c.id::text, '') AS id,
+			c.id::text AS id,
 			COALESCE(bc.name, c.full_name, '') AS full_name,
 			COALESCE(bc.email, c.email, '') AS email,
 			COALESCE(bc.phone, c.phone_number, '') AS phone_number,
-			-- Use the booking's identity_id (snapshot), NOT latest identity
-			COALESCE(b.identity_id::text, '') AS ktp_id,
-			COALESCE(i_by_booking.created_at, bc.created_at) AS uploaded_at,
-			COALESCE(i_by_booking.ktp_url, '') AS ktp_photo,
-			COALESCE(i_by_booking.status, '') AS status,
-			COALESCE(i_by_booking.reason, '') AS reason
+			COALESCE(i_latest.id::text, '') AS ktp_id,
+			COALESCE(i_latest.created_at, bc.created_at) AS uploaded_at,
+			COALESCE(i_latest.ktp_url, '') AS ktp_photo,
+			COALESCE(i_latest.status, '') AS status,
+			COALESCE(i_latest.reason, '') AS reason
 		FROM booking b
 		LEFT JOIN booking_customer bc ON b.id = bc.booking_id
 		LEFT JOIN customer c ON b.user_id = c.id
-		-- Join with the booking's specific identity snapshot (booking.identity_id)
-		LEFT JOIN identity i_by_booking ON b.identity_id = i_by_booking.id
+		-- Join with the latest identity per user
+		LEFT JOIN LATERAL (
+			SELECT id, ktp_url, status, reason, created_at
+			FROM identity
+			WHERE user_id = b.user_id
+			ORDER BY created_at DESC
+			LIMIT 1
+		) i_latest ON true
 		WHERE b.hoster_id = $1
-		-- Order to get the most complete booking per user:
-		-- 1. Prefer bookings that have both booking_customer AND identity_id
-		-- 2. Then prefer bookings with identity_id
-		-- 3. Then prefer most recent booking
+		-- Order to get the most recent booking per user
 		ORDER BY 
 			b.user_id,
-			(bc.id IS NOT NULL AND b.identity_id IS NOT NULL) DESC,
-			(b.identity_id IS NOT NULL) DESC,
 			b.created_at DESC
 	`
 

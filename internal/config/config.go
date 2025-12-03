@@ -30,13 +30,16 @@ StorageConfig berisi semua konfigurasi untuk Supabase Storage (S3-compatible).
 Digunakan oleh utils.Storage untuk upload, delete, dan presigned URL.
 */
 type StorageConfig struct {
-	AccessKey string
-	SecretKey string
-	Endpoint  string
-	Region    string
-	Bucket    string
-	ProjectID string
-	Domain    string
+	AccessKey      string
+	SecretKey      string
+	Endpoint       string
+	Region         string
+	CustomerBucket string // Existing untuk KTP
+	HosterBucket   string // Tambah untuk item
+	ProjectID      string
+	Domain         string
+	ItemBucket     string // Map ke STORAGE_HOSTER_BUCKET
+	Bucket         string // Tambah ini
 }
 
 /*
@@ -114,13 +117,27 @@ Output error:
 - log.Fatal (panic) → jika ada env yang hilang (via MustGetEnv)
 */
 func LoadStorageConfig() StorageConfig {
-	return StorageConfig{
-		AccessKey: MustGetEnv("STORAGE_ACCESS_KEY"),
-		SecretKey: MustGetEnv("STORAGE_SECRET_KEY"),
-		Endpoint:  MustGetEnv("STORAGE_ENDPOINT"),
-		Region:    MustGetEnv("STORAGE_REGION"),
-		Bucket:    MustGetEnv("STORAGE_BUCKET"),
-		ProjectID: MustGetEnv("STORAGE_PROJECT_ID"),
-		Domain:    MustGetEnv("STORAGE_DOMAIN"),
+	cfg := StorageConfig{
+		AccessKey:      MustGetEnv("STORAGE_ACCESS_KEY"),
+		SecretKey:      MustGetEnv("STORAGE_SECRET_KEY"),
+		Endpoint:       MustGetEnv("STORAGE_ENDPOINT"),
+		Region:         MustGetEnv("STORAGE_REGION"),
+		CustomerBucket: MustGetEnv("STORAGE_CUSTOMER_BUCKET"),
+		HosterBucket:   MustGetEnv("STORAGE_HOSTER_BUCKET"),
+		ProjectID:      MustGetEnv("STORAGE_PROJECT_ID"),
+		Domain:         MustGetEnv("STORAGE_DOMAIN"),
+		ItemBucket:     getEnv("STORAGE_HOSTER_BUCKET", "hoster"), // Map ke STORAGE_HOSTER_BUCKET
+		Bucket:         getEnv("STORAGE_HOSTER_BUCKET", "hoster"), // Tambah ini
 	}
+	cfg.HosterBucket = getEnv("STORAGE_HOSTER_BUCKET", "hoster")
+	cfg.CustomerBucket = getEnv("STORAGE_CUSTOMER_BUCKET", "customer")
+	return cfg
+}
+
+// getEnv mengembalikan nilai env dengan default jika tidak ada
+func getEnv(key, defaultVal string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return defaultVal
 }

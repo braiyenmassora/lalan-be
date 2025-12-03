@@ -10,6 +10,7 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"lalan-be/internal/domain"
+	"lalan-be/internal/message"
 )
 
 /*
@@ -202,6 +203,10 @@ func (r *authRepository) CreateHoster(h *domain.Hoster) error {
 
 	if err != nil {
 		log.Printf("CreateHoster (auth): %v", err)
+		// Check duplicate email constraint
+		if strings.Contains(err.Error(), "duplicate") {
+			return errors.New("email already exists")
+		}
 		return err
 	}
 	return nil
@@ -252,8 +257,8 @@ Output:
 */
 func (r *authRepository) SendOTP(email string, otp string) error {
 	query := `
-		UPDATE customer
-		SET email_verified = true,
+		UPDATE customer 
+		SET email_verified = true, 
 			verification_token = NULL,
 			verification_expire = NULL,
 			updated_at = NOW()
@@ -267,7 +272,7 @@ func (r *authRepository) SendOTP(email string, otp string) error {
 	n, _ := res.RowsAffected()
 	if n == 0 {
 		log.Printf("SendOTP (auth): invalid or expired OTP for email %s", email)
-		return errors.New("invalid or expired OTP")
+		return errors.New(message.OTPInvalid)
 	}
 	return nil
 }
@@ -276,19 +281,35 @@ func (r *authRepository) SendOTP(email string, otp string) error {
 ResendOTP memperbarui token OTP untuk customer.
 
 Fungsi ini mengupdate verification_token dan verification_expire
-untuk customer dengan email tertentu.
+untuk customer dengan email tertentu yang belum verified.
 
 Output:
-- error jika customer tidak ditemukan atau update gagal.
+- error jika customer tidak ditemukan, sudah verified, atau update gagal.
 - nil jika berhasil.
 */
 func (r *authRepository) ResendOTP(email string, newOTP string, expireTime time.Time) error {
+	// Cek dulu apakah customer sudah verified
+	var emailVerified bool
+	err := r.db.QueryRow(`SELECT email_verified FROM customer WHERE email = $1`, email).Scan(&emailVerified)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return errors.New(message.CustomerNotFound)
+		}
+		log.Printf("ResendOTP (auth): error checking customer: %v", err)
+		return err
+	}
+
+	// Jika sudah verified, tidak boleh resend OTP
+	if emailVerified {
+		return errors.New(message.OTPAlreadyVerified)
+	}
+
 	query := `
 		UPDATE customer 
 		SET verification_token = $1, 
 			verification_expire = $2, 
 			updated_at = NOW() 
-		WHERE email = $3
+		WHERE email = $3 AND email_verified = false
 	`
 	res, err := r.db.Exec(query, newOTP, expireTime, email)
 	if err != nil {
@@ -298,7 +319,103 @@ func (r *authRepository) ResendOTP(email string, newOTP string, expireTime time.
 	n, _ := res.RowsAffected()
 	if n == 0 {
 		log.Printf("ResendOTP (auth): no customer found for email %s", email)
-		return errors.New("customer not found")
+		return errors.New(message.CustomerNotFound)
+	}
+	return nil
+}
+
+/*
+RequestPasswordReset generates dan simpan reset token untuk customer atau hoster.
+
+Output:
+- error jika user tidak ditemukan atau update gagal.
+- nil jika berhasil.
+*/
+func (r *authRepository) RequestPasswordReset(email, role, resetToken string, expireTime time.Time) error {
+	var query string
+
+	if role == "customer" {
+		query = `
+			UPDATE customer 
+			SET verification_token = $1, 
+				verification_expire = $2, 
+				updated_at = NOW() 
+			WHERE email = $3
+		`
+	} else if role == "hoster" {
+		query = `
+			UPDATE hoster 
+			SET reset_token = $1, 
+				reset_token_expire = $2, 
+				updated_at = NOW() 
+			WHERE email = $3
+		`
+	} else {
+		return errors.New("invalid role")
+	}
+
+	res, err := r.db.Exec(query, resetToken, expireTime, email)
+	if err != nil {
+		log.Printf("RequestPasswordReset (auth): error updating reset token for %s %s: %v", role, email, err)
+		return err
+	}
+
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		if role == "customer" {
+			return errors.New(message.CustomerNotFound)
+		}
+		return errors.New(message.HosterNotFound)
+	}
+	return nil
+}
+
+/*
+ResetPassword memverifikasi reset token dan update password.
+
+Output:
+- error jika token invalid/expired atau update gagal.
+- nil jika berhasil.
+*/
+func (r *authRepository) ResetPassword(email, role, token, newPasswordHash string) error {
+	var query string
+
+	if role == "customer" {
+		query = `
+			UPDATE customer 
+			SET password_hash = $1,
+				verification_token = NULL,
+				verification_expire = NULL,
+				updated_at = NOW() 
+			WHERE email = $2 
+				AND verification_token = $3 
+				AND verification_expire > NOW()
+		`
+	} else if role == "hoster" {
+		query = `
+			UPDATE hoster 
+			SET password_hash = $1,
+				reset_token = NULL,
+				reset_token_expire = NULL,
+				updated_at = NOW() 
+			WHERE email = $2 
+				AND reset_token = $3 
+				AND reset_token_expire > NOW()
+		`
+	} else {
+		return errors.New("invalid role")
+	}
+
+	res, err := r.db.Exec(query, newPasswordHash, email, token)
+	if err != nil {
+		log.Printf("ResetPassword (auth): error resetting password for %s %s: %v", role, email, err)
+		return err
+	}
+
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		log.Printf("ResetPassword (auth): invalid or expired token for %s %s", role, email)
+		return errors.New(message.ResetTokenInvalid)
 	}
 	return nil
 }

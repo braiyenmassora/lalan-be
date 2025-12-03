@@ -21,7 +21,7 @@ const (
 	FileTooLarge  = "%s too large"
 	UploadFailed  = "failed to upload %s"
 
-	// ITEM specific messages (optional, explicit)
+	// ITEM
 	ItemCreated  = "item created"
 	ItemUpdated  = "item updated"
 	ItemDeleted  = "item deleted"
@@ -34,8 +34,11 @@ const (
 	CustomerAccessRequired = "customer access required"
 	InvalidStatus          = "invalid status"
 	BookingConflict        = "booking conflict"
+	AdminCreated           = "admin created successfully"
+	HosterCreated          = "hoster created successfully"
+	CustomerCreated        = "customer created successfully"
 
-	// OTP RELATED
+	// OTP
 	OTPSent             = "OTP sent to %s"
 	OTPResent           = "OTP resent to %s"
 	OTPExpired          = "OTP expired"
@@ -43,7 +46,7 @@ const (
 	OTPAttemptsExceeded = "too many attempts, request new OTP"
 	OTPAlreadyVerified  = "email already verified"
 
-	// BOOKING RELATED
+	// BOOKING
 	BookingCreated          = "booking has been created"
 	BookingConfirmed        = "booking confirmed"
 	BookingCancelled        = "booking cancelled"
@@ -52,16 +55,36 @@ const (
 	BookingNotCancellable   = "booking cannot be cancelled"
 	BookingOverlap          = "booking time overlaps"
 
-	// IDENTITY VERIFICATION
-	IdentitySubmitted               = "identity submitted"
-	IdentityApproved                = "identity approved"
-	IdentityRejected                = "identity rejected: %s"
-	IdentityAlreadyVerified         = "identity already verified"
-	IdentityAlreadyUploaded         = "identity already uploaded"
-	IdentityCanOnlyUpdateIfRejected = "can only update if rejected"
-	IdentityPendingReview           = "identity under review"
+	// KTP
+	KTPUploaded                = "KTP uploaded successfully"
+	KTPUpdated                 = "KTP updated successfully"
+	KTPStatusRetrieved         = "KTP status retrieved"
+	KTPListRetrieved           = "KTP list retrieved successfully"
+	KTPSubmitted               = "KTP submitted"
+	KTPApproved                = "KTP approved"
+	KTPRejected                = "KTP rejected"
+	KTPRejectedUploadNew       = "KTP rejected, please upload new KTP"
+	KTPAlreadyVerified         = "KTP already verified"
+	KTPAlreadyUploaded         = "KTP already uploaded"
+	KTPCanOnlyUpdateIfRejected = "can only update if rejected"
+	KTPPendingReview           = "KTP under review"
+	KTPRequired                = "KTP upload required"
+	KTPUploadFailed            = "failed to upload KTP"
+
+	// ID Validation
+	UserIDRequired     = "user ID required"
+	HosterIDRequired   = "hoster ID required"
+	CustomerIDRequired = "customer ID required"
+	AdminIDRequired    = "admin ID required"
+	FileRequired       = "file required"
 
 	// Additional
 	EmailAlreadyExists    = "email already exists"
+	EmailNotVerified      = "email not verified"
 	CategoryAlreadyExists = "category already exists"
+	CustomerNotFound      = "customer not found"
+	HosterNotFound        = "hoster not found"
+	ResetTokenSent        = "reset password token sent"
+	ResetTokenInvalid     = "invalid or expired reset token"
+	PasswordResetSuccess  = "password reset successfully"
 )

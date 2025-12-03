@@ -16,7 +16,8 @@ Alur kerja:
 3. Daftarkan endpoint:
   - GET  /item         → daftar semua item milik hoster
   - POST /item         → buat item baru oleh hoster
-  - DELETE /item/{id}  → hapus item milik hoster berdasarkan ID (hoster diambil dari session/token)
+  - PUT  /item/{id}    → update item milik hoster berdasarkan ID
+  - DELETE /item/{id}  → hapus item milik hoster berdasarkan ID
 
 Output:
 - Router terkonfigurasi dengan endpoint hoster yang aman dan siap digunakan
@@ -31,6 +32,7 @@ func SetupItemRoutes(router *mux.Router, h *HosterItemHandler) {
 	// Route normal (use singular "item")
 	protected.HandleFunc("/item", h.GetListItem).Methods("GET", "OPTIONS")
 	protected.HandleFunc("/item", h.CreateItem).Methods("POST", "OPTIONS")
+	protected.HandleFunc("/item/{id}", h.UpdateItem).Methods("PUT", "OPTIONS")
 	protected.HandleFunc("/item/{id}", h.DeleteItem).Methods("DELETE", "OPTIONS")
 
 	// Opsional: handler khusus OPTIONS biar return 204 (lebih bersih)
