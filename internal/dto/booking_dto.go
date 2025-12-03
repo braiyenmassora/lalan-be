@@ -125,6 +125,7 @@ type BookingListByHosterResponse struct {
 	BookingID    string    `json:"booking_id" db:"booking_id"`
 	CustomerName string    `json:"customer_name" db:"customer_name"`
 	ItemName     string    `json:"item_name" db:"item_name"`
+	Quantity     int       `json:"quantity" db:"quantity"`
 	StartDate    time.Time `json:"start_date" db:"start_date"`
 	EndDate      time.Time `json:"end_date" db:"end_date"`
 	Total        float64   `json:"total" db:"total"`

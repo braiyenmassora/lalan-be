@@ -18,8 +18,6 @@ Digunakan untuk dashboard dan detail booking yang dimiliki hoster.
 */
 type HosterBookingRepository interface {
 	GetListBookings(hosterID string) ([]dto.BookingListByHosterResponse, error)
-	// GetCustomerList returns distinct customers (snapshot + enrichment) who made bookings
-	// against the given hoster. Returned rows are unique by booking.user_id.
 	GetCustomerList(hosterID string) ([]dto.CustomerListByHosterResponse, error)
 	GetBookingDetail(bookingID string) (*dto.BookingDetailByHosterResponse, error)
 	UpdateBookingStatus(bookingID, newStatus string) error
@@ -62,13 +60,16 @@ func (r *hosterBookingRepository) GetListBookings(hosterID string) ([]dto.Bookin
 			b.id AS booking_id,
 			COALESCE(NULLIF(bc.name, ''), c.full_name, '') AS customer_name,
 			COALESCE(items.item_name, '') AS item_name,
+			COALESCE(items.quantity, 0) AS quantity,
 			b.start_date::timestamptz AS start_date,
 			b.end_date::timestamptz AS end_date,
 			b.total,
 			b.status
 		FROM booking b
 		LEFT JOIN (
-			SELECT booking_id, string_agg(name, ', ' ORDER BY name) AS item_name
+			SELECT booking_id, 
+			       string_agg(name, ', ' ORDER BY name) AS item_name,
+			       SUM(quantity) AS quantity
 			FROM booking_item
 			GROUP BY booking_id
 		) items ON items.booking_id = b.id
