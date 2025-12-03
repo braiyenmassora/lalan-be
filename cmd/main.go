@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"lalan-be/internal/config"
+	admincategory "lalan-be/internal/features/admin/category"
 	adminidentity "lalan-be/internal/features/admin/identity"
 	auth "lalan-be/internal/features/auth"
 	booking "lalan-be/internal/features/customer/booking"
@@ -68,6 +69,9 @@ func main() {
 	adminIdentityHandler := adminidentity.NewAdminIdentityHandler(
 		adminidentity.NewAdminIdentityService(adminidentity.NewAdminIdentityRepository(dbCfg.DB)),
 	)
+	adminCategoryHandler := admincategory.NewCategoryHandler(
+		admincategory.NewCategoryService(admincategory.NewCategoryRepository(dbCfg.DB)),
+	)
 
 	// 6. Setup router & routes
 	router := mux.NewRouter()
@@ -85,10 +89,10 @@ func main() {
 	// Hoster
 	hosterbooking.SetupBookingRoutes(router, hosterHandler)
 	hosteritem.SetupItemRoutes(router, hosterItemHandler)
-	log.Println("Hoster item routes registered (GET /item, POST /item, DELETE /item/{id})")
 
 	// Admin
 	adminidentity.SetupAdminIdentityRoutes(router, adminIdentityHandler)
+	admincategory.SetupCategoryRoutes(router, adminCategoryHandler)
 
 	// 7. Konfigurasi HTTP server dengan timeout aman
 	srv := &http.Server{

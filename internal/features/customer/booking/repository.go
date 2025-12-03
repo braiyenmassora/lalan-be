@@ -2,7 +2,6 @@ package booking
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"time"
 
@@ -62,16 +61,8 @@ Output error:
 - error DB → langsung diteruskan ke service (akan jadi 500 atau 400 sesuai konteks)
 */
 func (r *bookingRepository) CreateBooking(booking *domain.Booking, items []domain.BookingItem, customer domain.BookingCustomer) (*dto.BookingDetailByCustomerResponse, error) {
-	// 1. Validasi Identity (KTP)
-	identity, err := r.GetIdentityByUserID(booking.UserID)
-	if err != nil {
-		log.Printf("CreateBooking: error checking identity for user %s: %v", booking.UserID, err)
-		return nil, err
-	}
-	if identity == nil {
-		log.Printf("CreateBooking: no identity found for user %s", booking.UserID)
-		return nil, fmt.Errorf("silakan upload ktp terlebih dahulu")
-	}
+	// Repository tidak perlu validasi business logic KTP
+	// Validasi sudah dilakukan di service layer
 
 	// 2. Mulai Transaction
 	tx, err := r.db.Beginx()
@@ -151,29 +142,38 @@ func (r *bookingRepository) CreateBooking(booking *domain.Booking, items []domai
 }
 
 /*
-GetIdentityByUserID mengambil data KTP terverifikasi terakhir milik user.
-Digunakan hanya untuk pengecekan keberadaan KTP sebelum create booking.
+GetIdentityByUserID mengambil data KTP user untuk validasi booking.
+
+Best Practice Logic:
+1. Ambil KTP terbaru (ORDER BY created_at DESC)
+2. Jika terbaru = approved → ✅ pakai ini
+3. Jika terbaru = pending → ✅ pakai ini
+4. Jika terbaru = rejected → ❌ return nil (user harus upload baru)
+
+Kenapa ambil terbaru saja? Karena:
+- Jika admin reject KTP, user HARUS upload baru
+- KTP lama yang approved tidak boleh dipakai lagi setelah ada upload baru
+- Ini memastikan admin selalu validasi KTP terbaru
 
 Output sukses:
-- *domain.Identity jika ada
-- nil (bukan error) jika user belum upload KTP
+- *domain.Identity jika KTP terbaru valid (approved/pending)
+- nil jika KTP terbaru rejected atau belum upload
 Output error:
 - error hanya jika query database gagal
 */
 func (r *bookingRepository) GetIdentityByUserID(userID string) (*domain.Identity, error) {
 	var identity domain.Identity
-	// Pilih hanya identity yang sudah ter-verified (verified = true) dan ambil
-	// yang memiliki verified_at terbaru. Ini memastikan saat membuat booking
-	// kita selalu memakai identity yang sah dan paling baru berdasarkan waktu
-	// verifikasi.
+	// Ambil KTP TERBARU saja (by created_at DESC)
+	// Jika terbaru = rejected → return nil (user harus upload baru)
+	// Jika terbaru = pending/approved → return identity
 	query := `
 		SELECT
 			id, user_id, ktp_url, verified, status,
 			COALESCE(reason, '') AS reason,
 			verified_at, created_at, updated_at
 		FROM identity
-		WHERE user_id = $1 AND verified = true
-		ORDER BY verified_at DESC NULLS LAST, created_at DESC
+		WHERE user_id = $1
+		ORDER BY created_at DESC
 		LIMIT 1
 	`
 	err := r.db.Get(&identity, query, userID)
@@ -184,6 +184,9 @@ func (r *bookingRepository) GetIdentityByUserID(userID string) (*domain.Identity
 		log.Printf("GetIdentityByUserID: database error for user %s: %v", userID, err)
 		return nil, err
 	}
+
+	// Return identity apa adanya (termasuk rejected)
+	// Service layer yang akan validasi dan beri pesan error sesuai status
 	return &identity, nil
 }
 
@@ -309,22 +312,22 @@ func (r *bookingRepository) GetBookingDetail(bookingID string) (*dto.BookingDeta
 		return nil, err
 	}
 
-	// 4. Get Identity Info (opsional)
+	// 4. Get Identity Info yang digunakan untuk booking (dari identity_id)
 	var identity domain.Identity
-	queryIdentity := `
-		SELECT
-			id, user_id, ktp_url, verified, status,
-			COALESCE(reason, '') AS reason,
-			verified_at, created_at, updated_at
-		FROM identity
-		WHERE user_id = $1
-		ORDER BY verified_at DESC NULLS LAST, created_at DESC
-		LIMIT 1
-	`
-	err = r.db.Get(&identity, queryIdentity, booking.UserID)
-	if err != nil && err != sql.ErrNoRows {
-		log.Printf("GetBookingDetail: error querying identity for user %s: %v", booking.UserID, err)
-		return nil, err
+	if booking.IdentityID != nil {
+		queryIdentity := `
+			SELECT
+				id, user_id, ktp_url, verified, status,
+				COALESCE(reason, '') AS reason,
+				verified_at, created_at, updated_at
+			FROM identity
+			WHERE id = $1
+		`
+		err = r.db.Get(&identity, queryIdentity, *booking.IdentityID)
+		if err != nil && err != sql.ErrNoRows {
+			log.Printf("GetBookingDetail: error querying identity %s: %v", *booking.IdentityID, err)
+			return nil, err
+		}
 	}
 
 	// 5. Build Response DTO - MAPPING MANUAL

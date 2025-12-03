@@ -1,9 +1,10 @@
 package identity
 
 import (
-	"fmt"
+	"errors"
 
 	"lalan-be/internal/domain"
+	"lalan-be/internal/message"
 )
 
 /*
@@ -54,11 +55,11 @@ Output error:
 */
 func (s *AdminIdentityService) ValidateIdentity(identityID, status, reason string) error {
 	if status != "approved" && status != "rejected" {
-		return fmt.Errorf("invalid status: must be 'approved' or 'rejected'")
+		return errors.New(message.InvalidStatus)
 	}
 
 	if status == "rejected" && reason == "" {
-		return fmt.Errorf("reason is required when rejecting identity")
+		return errors.New("reason required when rejecting KTP")
 	}
 
 	// Use the repository ValidateIdentity which targets a specific identity record id
@@ -67,16 +68,16 @@ func (s *AdminIdentityService) ValidateIdentity(identityID, status, reason strin
 }
 
 /*
-GetIdentity mengambil detail identitas satu user berdasarkan userID.
+GetIdentity mengambil detail identitas berdasarkan ID KTP.
 
 Alur kerja:
 1. Delegasikan ke repository
 
 Output sukses:
-- (*model.IdentityModel, nil)
+- (*domain.Identity, nil)
 Output error:
 - (nil, error) → identitas tidak ditemukan / DB error
 */
-func (s *AdminIdentityService) GetIdentity(userID string) (*domain.Identity, error) {
-	return s.repo.GetIdentityByUserID(userID)
+func (s *AdminIdentityService) GetIdentity(id string) (*domain.Identity, error) {
+	return s.repo.GetIdentityByID(id)
 }

@@ -38,20 +38,19 @@ func NewBookingHandler(s BookingService) *BookingHandler {
 }
 
 /*
-CreateBooking menangani endpoint POST /bookings untuk membuat booking baru.
+CreateBooking menangani request pembuatan booking baru.
 
-Alur kerja:
- 1. Validasi HTTP method harus POST
- 2. Decode JSON body ke struct CreateBookingRequest dengan strict mode
-    (DisallowUnknownFields) agar client tidak bisa menyisipkan field tak terduga
- 3. Panggil service.CreateBooking() dengan context dari request
- 4. Tangani error khusus dari domain (contoh: KTP belum diupload)
- 5. Return response sukses dengan detail booking yang baru dibuat
+Langkah-langkah:
+1. Validasi method & decode JSON.
+2. Validasi input (misal item tidak kosong, tanggal valid).
+3. Panggil service CreateBooking.
+4. Jika error spesifik "silakan upload ktp terlebih dahulu", return 400 Bad Request.
+5. Jika error lain, return 500 Internal Server Error.
 
-Output sukses:
-- Status: 200 OK
-- Body:   detail booking (biasanya termasuk booking_id, status, dll)
-- Message: "Booking berhasil dibuat"
+Output:
+- 200 OK: Booking berhasil dibuat, return detail booking.
+- 400 Bad Request: Validasi gagal (misal KTP belum upload).
+- 500 Internal Server Error: Kesalahan sistem.
 */
 func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	log.Printf("CreateBooking: received request")
@@ -61,34 +60,44 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req dto.CreateBookingByCustomerRequest
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&req); err != nil {
-		log.Printf("CreateBooking: invalid JSON: %v", err)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		log.Printf("CreateBooking: decode error: %v", err)
 		response.BadRequest(w, message.BadRequest)
 		return
 	}
 
-	// ambil userID dari middleware untuk konsistensi (handler mengatur auth)
+	// Ambil userID dari middleware context
 	userID := middleware.GetUserID(r)
 	if userID == "" {
 		response.Unauthorized(w, message.Unauthorized)
 		return
 	}
 
-	detail, err := h.service.CreateBooking(userID, req)
+	// Validasi input di sini jika perlu...
+
+	resp, err := h.service.CreateBooking(userID, req)
 	if err != nil {
 		log.Printf("CreateBooking: service error: %v", err)
-		// Error domain-specific yang ingin ditampilkan langsung ke client
-		if err.Error() == "silakan upload ktp terlebih dahulu" {
-			response.Error(w, http.StatusBadRequest, err.Error())
+		errMsg := err.Error()
+
+		// Cek exact match untuk error constants
+		if errMsg == message.KTPRequired {
+			response.BadRequest(w, message.KTPRequired)
 			return
 		}
-		response.Error(w, http.StatusInternalServerError, message.InternalError)
+		if errMsg == message.KTPRejectedUploadNew {
+			response.BadRequest(w, message.KTPRejectedUploadNew)
+			return
+		}
+
+		// Semua error lain dari service = BadRequest (business logic error)
+		response.BadRequest(w, errMsg)
 		return
 	}
 
-	response.OK(w, detail, message.BookingCreated)
+	response.OK(w, resp, message.Success)
 }
 
 /*

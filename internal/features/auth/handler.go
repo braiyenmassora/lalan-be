@@ -87,9 +87,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	resp, err := h.service.Login(req.Email, req.Password)
 	if err != nil {
 		log.Printf("Auth.Login: login failed: %v", err)
-		// Preserve customer-specific "email not verified" flow as BadRequest
-		if err.Error() == "Email belum diverifikasi. Silakan verifikasi email terlebih dahulu." {
-			response.BadRequest(w, err.Error())
+		// Customer email not verified
+		if err.Error() == message.EmailNotVerified {
+			response.BadRequest(w, message.EmailNotVerified)
 			return
 		}
 		response.Unauthorized(w, message.LoginFailed)
@@ -174,8 +174,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 			UpdatedAt:    time.Now(),
 		}
 
-		resp, err := h.service.RegisterCustomer(cust)
-		if err != nil {
+		if err := h.service.RegisterCustomer(cust); err != nil {
 			log.Printf("Auth.Register: create customer failed: %v", err)
 			if err.Error() == message.EmailAlreadyExists {
 				response.BadRequest(w, message.EmailAlreadyExists)
@@ -184,7 +183,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 			response.Error(w, http.StatusInternalServerError, message.InternalError)
 			return
 		}
-		response.OK(w, resp, message.OTPSent)
+		response.OK(w, nil, message.CustomerCreated)
 		return
 	}
 
@@ -207,10 +206,14 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := h.service.RegisterHoster(hoster); err != nil {
 			log.Printf("Auth.Register: create hoster failed: %v", err)
+			if err.Error() == message.EmailAlreadyExists {
+				response.BadRequest(w, message.EmailAlreadyExists)
+				return
+			}
 			response.Error(w, http.StatusInternalServerError, message.InternalError)
 			return
 		}
-		response.OK(w, hoster, message.Created)
+		response.OK(w, hoster, message.HosterCreated)
 		return
 	}
 
@@ -229,10 +232,14 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := h.service.RegisterAdmin(admin); err != nil {
 			log.Printf("Auth.Register: create admin failed: %v", err)
+			if err.Error() == message.EmailAlreadyExists {
+				response.BadRequest(w, message.EmailAlreadyExists)
+				return
+			}
 			response.Error(w, http.StatusInternalServerError, message.InternalError)
 			return
 		}
-		response.OK(w, admin, message.Created)
+		response.OK(w, admin, message.AdminCreated)
 		return
 	}
 
@@ -246,7 +253,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 VerifyEmail memverifikasi kode OTP untuk aktivasi akun customer.
 
 Fungsi ini menerima email dan kode OTP, lalu memvalidasinya ke database.
-Jika valid, status akun customer akan diubah menjadi aktif (is_verified = true).
+Jika valid, status akun customer akan diubah menjadi aktif (email_verified = true).
 
 Output:
 - 200 OK: Verifikasi berhasil.
@@ -275,7 +282,7 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.service.SendOTP(req.Email, req.OTP); err != nil {
 		log.Printf("Auth.VerifyEmail: error: %v", err)
-		if err.Error() == message.OTPInvalid || err.Error() == "invalid or expired OTP" {
+		if err.Error() == message.OTPInvalid {
 			response.BadRequest(w, message.OTPInvalid)
 			return
 		}
@@ -322,9 +329,107 @@ func (h *AuthHandler) ResendOTP(w http.ResponseWriter, r *http.Request) {
 	otp, err := h.service.ResendOTP(req.Email)
 	if err != nil {
 		log.Printf("Auth.ResendOTP: error: %v", err)
+		if err.Error() == message.OTPAlreadyVerified {
+			response.BadRequest(w, message.OTPAlreadyVerified)
+			return
+		}
+		if err.Error() == message.CustomerNotFound {
+			response.BadRequest(w, message.CustomerNotFound)
+			return
+		}
 		response.Error(w, http.StatusInternalServerError, message.InternalError)
 		return
 	}
 	// Note: Mengembalikan OTP di response hanya untuk development/testing
 	response.OK(w, map[string]string{"otp": otp}, message.Success)
+}
+
+/*
+ForgotPassword menangani request lupa password untuk customer dan hoster.
+
+Fungsi ini generate reset token dan kirim ke email user.
+
+Output:
+- 200 OK: Reset token berhasil dikirim (return token untuk dev).
+- 400 Bad Request: Email tidak valid atau role tidak valid.
+- 500 Internal Server Error: Kesalahan server.
+*/
+func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Auth.ForgotPassword: received request")
+	if r.Method != http.MethodPost {
+		response.MethodNotAllowed(w, message.MethodNotAllowed)
+		return
+	}
+
+	var req dto.ForgotPasswordRequest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		log.Printf("Auth.ForgotPassword: invalid JSON: %v", err)
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+	if req.Email == "" || req.Role == "" {
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+
+	token, err := h.service.ForgotPassword(req.Email, req.Role)
+	if err != nil {
+		log.Printf("Auth.ForgotPassword: error: %v", err)
+		if err.Error() == message.CustomerNotFound {
+			response.BadRequest(w, message.CustomerNotFound)
+			return
+		}
+		if err.Error() == message.HosterNotFound {
+			response.BadRequest(w, message.HosterNotFound)
+			return
+		}
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
+		return
+	}
+	// Note: Mengembalikan token di response hanya untuk development/testing
+	response.OK(w, map[string]string{"reset_token": token}, message.ResetTokenSent)
+}
+
+/*
+ResetPassword menangani reset password dengan token.
+
+Fungsi ini memverifikasi token dan update password baru.
+
+Output:
+- 200 OK: Password berhasil direset.
+- 400 Bad Request: Token invalid/expired atau input tidak valid.
+- 500 Internal Server Error: Kesalahan server.
+*/
+func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Auth.ResetPassword: received request")
+	if r.Method != http.MethodPost {
+		response.MethodNotAllowed(w, message.MethodNotAllowed)
+		return
+	}
+
+	var req dto.ResetPasswordRequest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		log.Printf("Auth.ResetPassword: invalid JSON: %v", err)
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+	if req.Email == "" || req.Role == "" || req.Token == "" || req.NewPassword == "" {
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+
+	if err := h.service.ResetPassword(req.Email, req.Role, req.Token, req.NewPassword); err != nil {
+		log.Printf("Auth.ResetPassword: error: %v", err)
+		if err.Error() == message.ResetTokenInvalid {
+			response.BadRequest(w, message.ResetTokenInvalid)
+			return
+		}
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
+		return
+	}
+	response.OK(w, nil, message.PasswordResetSuccess)
 }

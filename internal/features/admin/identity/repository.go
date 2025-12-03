@@ -1,7 +1,6 @@
 package identity
 
 import (
-	"fmt"
 	"time"
 
 	"lalan-be/internal/domain"
@@ -28,26 +27,27 @@ func NewAdminIdentityRepository(db *sqlx.DB) *AdminIdentityRepository {
 }
 
 /*
-GetPendingIdentities mengambil semua identitas yang berstatus 'pending'.
+GetPendingIdentities mengambil identitas terbaru per user yang berstatus 'pending'.
 
 Alur kerja:
-1. Query SELECT dengan filter status = 'pending'
-2. Urutkan dari yang paling lama (ASC)
+1. Query SELECT dengan DISTINCT ON untuk ambil KTP terbaru per user
+2. Filter status = 'pending'
+3. Urutkan berdasarkan user_id dan created_at DESC (terbaru)
 
 Output sukses:
-- ([]*model.IdentityModel, nil)
+- ([]*model.IdentityModel, nil) - hanya KTP terbaru per user
 Output error:
 - (nil, error) → query gagal / koneksi DB bermasalah
 */
 func (r *AdminIdentityRepository) GetPendingIdentities() ([]*domain.Identity, error) {
 	var identities []*domain.Identity
 	query := `
-		SELECT 
+		SELECT DISTINCT ON (user_id)
 			id, user_id, ktp_url, verified, status, reason, 
 			verified_at, created_at, updated_at 
 		FROM identity 
 		WHERE status = 'pending' 
-		ORDER BY created_at ASC
+		ORDER BY user_id, created_at DESC
 	`
 
 	err := r.db.Select(&identities, query)
@@ -93,10 +93,35 @@ func (r *AdminIdentityRepository) UpdateIdentityStatus(userID, status, reason st
 }
 
 /*
+GetIdentityByID mengambil satu record identitas berdasarkan ID KTP.
+
+Output sukses:
+- (*domain.Identity, nil)
+Output error:
+- (nil, error) → record tidak ditemukan / query error
+*/
+func (r *AdminIdentityRepository) GetIdentityByID(id string) (*domain.Identity, error) {
+	var identity domain.Identity
+	query := `
+		SELECT 
+			id, user_id, ktp_url, verified, status, reason, 
+			verified_at, created_at, updated_at 
+		FROM identity 
+		WHERE id = $1
+	`
+
+	err := r.db.Get(&identity, query, id)
+	if err != nil {
+		return nil, err
+	}
+	return &identity, nil
+}
+
+/*
 GetIdentityByUserID mengambil satu record identitas berdasarkan user_id.
 
 Output sukses:
-- (*model.IdentityModel, nil)
+- (*domain.Identity, nil)
 Output error:
 - (nil, error) → record tidak ditemukan / query error
 */
@@ -134,17 +159,10 @@ Output error:
 */
 func (r *AdminIdentityRepository) ValidateIdentity(identityID, status, reason string) error {
 	now := time.Now()
-	verified := false
+	verified := status == "approved"
 	var verifiedAt *time.Time
-
-	if status == "approved" {
-		verified = true
+	if verified {
 		verifiedAt = &now
-	} else if status == "rejected" {
-		verified = false
-		verifiedAt = nil
-	} else {
-		return fmt.Errorf("invalid status: %s", status)
 	}
 
 	// Explicit types for parameters reduce Postgres ambiguity when some values

@@ -72,7 +72,7 @@ Output error:
 func (s *bookingService) CreateBooking(userID string, req dto.CreateBookingByCustomerRequest) (*dto.BookingDetailByCustomerResponse, error) {
 	// 1. Validasi userID yang diberikan oleh handler (middleware)
 	if userID == "" {
-		return nil, errors.New(message.Unauthorized)
+		return nil, errors.New(message.UserIDRequired)
 	}
 
 	// 2. Validasi KTP (hanya cek keberadaan, detail validasi di repo)
@@ -84,7 +84,17 @@ func (s *bookingService) CreateBooking(userID string, req dto.CreateBookingByCus
 	if identity == nil {
 		// Jika tidak ada identity verifikasi yang valid, beri tahu user untuk
 		// mengunggah dan menyelesaikan proses verifikasi KTP terlebih dahulu.
-		return nil, fmt.Errorf("silakan upload dan verifikasi KTP terlebih dahulu")
+		return nil, errors.New(message.KTPRequired)
+	}
+
+	// 2a. Validasi status KTP - jika rejected, tampilkan reason dari admin
+	if identity.Status == "rejected" {
+		log.Printf("CreateBooking service: user %s has rejected KTP, cannot create booking", userID)
+		// Format: "KTP Rejected - {reason dari admin}"
+		if identity.Reason != "" {
+			return nil, fmt.Errorf("KTP Rejected - %s", identity.Reason)
+		}
+		return nil, errors.New(message.KTPRejectedUploadNew)
 	}
 
 	// 3. Parse tanggal & hitung durasi
@@ -135,11 +145,11 @@ func (s *bookingService) CreateBooking(userID string, req dto.CreateBookingByCus
 			return nil, errors.New(message.InternalError)
 		}
 		if hosterID == "" {
-			return nil, errors.New("hoster tidak dapat ditentukan untuk booking ini")
+			return nil, errors.New(message.HosterIDRequired)
 		}
 		booking.HosterID = hosterID
 	} else {
-		return nil, errors.New("booking harus memiliki minimal satu item")
+		return nil, errors.New("at least one item required")
 	}
 
 	// 8. Bangun booking items
@@ -196,7 +206,7 @@ Output error:
 */
 func (s *bookingService) GetListBookings(userID string) ([]dto.BookingListByCustomerResponse, error) {
 	if userID == "" {
-		return nil, errors.New(message.Unauthorized)
+		return nil, errors.New(message.UserIDRequired)
 	}
 
 	bookings, err := s.repo.GetListBookings(userID)
@@ -226,7 +236,7 @@ Output error:
 */
 func (s *bookingService) GetDetailBooking(userID string, bookingID string) (*dto.BookingDetailByCustomerResponse, error) {
 	if userID == "" {
-		return nil, errors.New(message.Unauthorized)
+		return nil, errors.New(message.UserIDRequired)
 	}
 
 	detail, err := s.repo.GetBookingDetail(bookingID)

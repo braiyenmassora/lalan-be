@@ -81,14 +81,14 @@ func (h *IdentityHandler) UploadKTP(w http.ResponseWriter, r *http.Request) {
 	file, header, err := r.FormFile("ktp")
 	if err != nil {
 		log.Printf("Identity.UploadKTP: missing ktp file: %v", err)
-		response.BadRequest(w, "File KTP diperlukan")
+		response.BadRequest(w, message.KTPRequired)
 		return
 	}
 	defer file.Close()
 
 	// Validasi tipe file harus gambar
 	if !strings.HasPrefix(header.Header.Get("Content-Type"), "image/") {
-		response.BadRequest(w, "File harus berupa gambar")
+		response.BadRequest(w, "file must be an image")
 		return
 	}
 
@@ -99,7 +99,7 @@ func (h *IdentityHandler) UploadKTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.OK(w, nil, "KTP berhasil diupload")
+	response.OK(w, nil, message.KTPUploaded)
 }
 
 /*
@@ -142,7 +142,7 @@ func (h *IdentityHandler) UpdateKTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
-		response.BadRequest(w, "Content-Type harus multipart/form-data dengan field 'ktp'")
+		response.BadRequest(w, "Content-Type must be multipart/form-data")
 		return
 	}
 
@@ -155,7 +155,7 @@ func (h *IdentityHandler) UpdateKTP(w http.ResponseWriter, r *http.Request) {
 	file, _, err := r.FormFile("ktp")
 	if err != nil {
 		log.Printf("Identity.UpdateKTP: missing ktp file: %v", err)
-		response.BadRequest(w, "File KTP diperlukan untuk update")
+		response.BadRequest(w, message.KTPRequired)
 		return
 	}
 	defer file.Close()
@@ -166,7 +166,7 @@ func (h *IdentityHandler) UpdateKTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.OK(w, nil, "KTP berhasil diupdate dan status disetel menjadi 'pending'")
+	response.OK(w, nil, message.KTPUpdated)
 }
 
 /*
@@ -211,9 +211,9 @@ func (h *IdentityHandler) GetStatusKTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if status == nil {
-		response.Error(w, http.StatusNotFound, "Status KTP tidak ditemukan")
+		response.Error(w, http.StatusNotFound, message.NotFound)
 		return
 	}
 
-	response.OK(w, status, "Status KTP berhasil diambil")
+	response.OK(w, status, message.KTPStatusRetrieved)
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"lalan-be/internal/message"
 	"lalan-be/internal/response"
 
 	"github.com/gorilla/mux"
@@ -42,10 +43,10 @@ Output error:
 func (h *AdminIdentityHandler) GetPendingIdentities(w http.ResponseWriter, r *http.Request) {
 	identities, err := h.service.GetPendingIdentities()
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, "Failed to retrieve pending identities")
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
 		return
 	}
-	response.OK(w, identities, "Pending identities retrieved successfully")
+	response.OK(w, identities, message.KTPListRetrieved)
 }
 
 /*
@@ -73,7 +74,7 @@ func (h *AdminIdentityHandler) ValidateIdentity(w http.ResponseWriter, r *http.R
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.BadRequest(w, "Invalid request body")
+		response.BadRequest(w, message.BadRequest)
 		return
 	}
 
@@ -83,30 +84,35 @@ func (h *AdminIdentityHandler) ValidateIdentity(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	response.OK(w, nil, "Identity validated successfully")
+	// Response message sesuai status
+	msg := message.KTPApproved
+	if req.Status == "rejected" {
+		msg = message.KTPRejected
+	}
+	response.OK(w, nil, msg)
 }
 
 /*
-GetIdentity menangani GET /api/v1/admin/identities/{userID}.
+GetIdentity menangani GET /api/v1/admin/identities/{id}.
 
 Alur kerja:
-1. Ambil userID dari path parameter
-2. Panggil service untuk detail identitas user tersebut
+1. Ambil id dari path parameter (KTP ID)
+2. Panggil service untuk detail identitas tersebut
 
 Output sukses:
 - 200 OK + data identitas
 Output error:
-- 404 Not Found → user tidak punya identitas / belum upload KTP
+- 404 Not Found → identitas tidak ditemukan
 */
 func (h *AdminIdentityHandler) GetIdentity(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	userID := vars["userID"]
+	id := vars["id"]
 
-	identity, err := h.service.GetIdentity(userID)
+	identity, err := h.service.GetIdentity(id)
 	if err != nil {
-		response.NotFound(w, "Identity not found")
+		response.NotFound(w, message.NotFound)
 		return
 	}
 
-	response.OK(w, identity, "Identity retrieved successfully")
+	response.OK(w, identity, message.KTPStatusRetrieved)
 }

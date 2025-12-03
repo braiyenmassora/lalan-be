@@ -68,7 +68,7 @@ Output error:
 */
 func (s *IdentityService) UploadKTP(ctx context.Context, userID string, file io.Reader) error {
 	if userID == "" {
-		return fmt.Errorf("userID required")
+		return errors.New("user ID required")
 	}
 
 	// Generate filename: ktp1_DDMMYYYY.jpg
@@ -110,10 +110,10 @@ Output error:
 */
 func (s *IdentityService) UpdateKTP(ctx context.Context, userID string, file io.Reader) error {
 	if userID == "" {
-		return fmt.Errorf("userID required")
+		return errors.New("user ID required")
 	}
 	if file == nil {
-		return fmt.Errorf("file is required")
+		return errors.New("file required")
 	}
 
 	// Generate filename dan path sama
@@ -155,7 +155,7 @@ Output error:
 */
 func (s *IdentityService) GetStatusKTP(ctx context.Context, userID string) (*dto.IdentityStatusByCustomerResponse, error) {
 	if userID == "" {
-		return nil, errors.New("userID is required")
+		return nil, errors.New("user ID required")
 	}
 
 	model, err := s.repo.GetStatusKTP(userID)
