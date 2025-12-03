@@ -71,6 +71,61 @@ func (h *HosterItemHandler) GetListItem(w http.ResponseWriter, r *http.Request) 
 }
 
 /*
+GetItemDetail menangani GET /api/v1/hoster/items/{id}
+
+Alur kerja:
+1. Validasi method GET
+2. Ambil hosterID dari JWT context
+3. Ambil itemID dari path parameter
+4. Panggil service untuk ambil detail item
+
+Output sukses:
+- 200 OK + detail item lengkap
+Output error:
+- 400 Bad Request (ID kosong)
+- 401 Unauthorized
+- 404 Not Found (item tidak ada atau bukan milik hoster)
+- 500 Internal Server Error
+*/
+func (h *HosterItemHandler) GetItemDetail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		response.BadRequest(w, message.MethodNotAllowed)
+		return
+	}
+
+	hosterID := middleware.GetUserID(r)
+	if hosterID == "" {
+		response.Unauthorized(w, message.Unauthorized)
+		return
+	}
+
+	vars := mux.Vars(r)
+	itemID := vars["id"]
+	if itemID == "" {
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+
+	detail, err := h.service.GetItemDetail(hosterID, itemID)
+	if err != nil {
+		log.Printf("GetItemDetail handler: service error hoster=%s item=%s err=%v", hosterID, itemID, err)
+		switch err.Error() {
+		case message.Unauthorized:
+			response.Unauthorized(w, message.Unauthorized)
+		case message.NotFound:
+			response.NotFound(w, message.ItemNotFound)
+		case message.BadRequest:
+			response.BadRequest(w, message.BadRequest)
+		default:
+			response.Error(w, http.StatusInternalServerError, message.InternalError)
+		}
+		return
+	}
+
+	response.OK(w, detail, message.Success)
+}
+
+/*
 CreateItem menangani POST /api/v1/hoster/items dengan support upload photos
 
 Alur kerja:

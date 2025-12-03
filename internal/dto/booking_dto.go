@@ -123,13 +123,12 @@ type BookingDetailByHosterResponse struct {
 // Endpoint: GET /hoster/booking
 type BookingListByHosterResponse struct {
 	BookingID    string    `json:"booking_id" db:"booking_id"`
+	CustomerName string    `json:"customer_name" db:"customer_name"`
+	ItemName     string    `json:"item_name" db:"item_name"`
 	StartDate    time.Time `json:"start_date" db:"start_date"`
 	EndDate      time.Time `json:"end_date" db:"end_date"`
 	Total        float64   `json:"total" db:"total"`
 	Status       string    `json:"status" db:"status"`
-	ItemName     string    `json:"item_name" db:"item_name"`
-	TotalItem    int       `json:"total_item" db:"total_item"`
-	CustomerName string    `json:"customer_name" db:"customer_name"`
 }
 
 // CustomerListByHosterResponse adalah response untuk list customer yang pernah booking
@@ -146,7 +145,7 @@ type BookingInfoResponse struct {
 	ID                   string     `json:"id"`
 	HosterID             string     `json:"hoster_id,omitempty"`
 	UserID               string     `json:"user_id,omitempty"`
-	IdentityID           *string    `json:"identity_id,omitempty"`
+	KTPID                *string    `json:"ktp_id,omitempty"`
 	StartDate            time.Time  `json:"start_date"`
 	EndDate              time.Time  `json:"end_date"`
 	TotalDays            int        `json:"total_days"`
@@ -166,15 +165,17 @@ type BookingInfoResponse struct {
 // BookingItemResponse berisi informasi item dalam booking
 // Digunakan untuk customer dan hoster view
 type BookingItemResponse struct {
-	ID              string `json:"id" db:"id"`
-	BookingID       string `json:"booking_id" db:"booking_id"`
-	ItemID          string `json:"item_id" db:"item_id"`
-	Name            string `json:"name" db:"name"`
-	Quantity        int    `json:"quantity" db:"quantity"`
-	PricePerDay     int    `json:"price_per_day" db:"price_per_day"`
-	DepositPerUnit  int    `json:"deposit_per_unit" db:"deposit_per_unit"`
-	SubtotalRental  int    `json:"subtotal_rental" db:"subtotal_rental"`
-	SubtotalDeposit int    `json:"subtotal_deposit" db:"subtotal_deposit"`
+	ID              string   `json:"id" db:"id"`
+	BookingID       string   `json:"booking_id" db:"booking_id"`
+	ItemID          string   `json:"item_id" db:"item_id"`
+	Name            string   `json:"name" db:"name"`
+	Description     string   `json:"description,omitempty" db:"description"`
+	Photos          []string `json:"photos,omitempty" db:"photos"`
+	Quantity        int      `json:"quantity" db:"quantity"`
+	PricePerDay     int      `json:"price_per_day" db:"price_per_day"`
+	DepositPerUnit  int      `json:"deposit_per_unit" db:"deposit_per_unit"`
+	SubtotalRental  int      `json:"subtotal_rental" db:"subtotal_rental"`
+	SubtotalDeposit int      `json:"subtotal_deposit" db:"subtotal_deposit"`
 }
 
 // CustomerInfoResponse berisi informasi dasar customer yang aman untuk ditampilkan
@@ -189,4 +190,26 @@ type CustomerInfoResponse struct {
 	Status      string     `json:"status,omitempty" db:"status"` // Status KTP: pending, approved, rejected
 	Reason      string     `json:"reason,omitempty" db:"reason"` // Alasan approve/reject KTP
 	UploadedAt  *time.Time `json:"uploaded_at,omitempty" db:"uploaded_at"`
+	VerifiedAt  *time.Time `json:"verified_at,omitempty" db:"verified_at"` // Waktu admin verify KTP
+}
+
+// ===================================================================
+// REQUEST DTO - HOSTER
+// ===================================================================
+
+// UpdateBookingStatusByHosterRequest adalah payload untuk update status booking oleh hoster
+// Endpoint: PUT /hoster/booking/{id}/status
+//
+// Contoh JSON:
+//
+//	{
+//	  "status": "on_progress"
+//	}
+//
+// Valid status transitions:
+// - pending → on_progress (hoster siapkan barang)
+// - on_progress → on_rent (barang sudah diserahkan ke customer)
+// - on_rent → completed (barang dikembalikan, kondisi OK)
+type UpdateBookingStatusByHosterRequest struct {
+	Status string `json:"status"` // "on_progress", "on_rent", "completed"
 }

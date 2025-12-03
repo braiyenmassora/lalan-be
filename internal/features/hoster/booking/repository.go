@@ -9,6 +9,7 @@ import (
 	"lalan-be/internal/dto"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 /*
@@ -21,6 +22,8 @@ type HosterBookingRepository interface {
 	// against the given hoster. Returned rows are unique by booking.user_id.
 	GetCustomerList(hosterID string) ([]dto.CustomerListByHosterResponse, error)
 	GetBookingDetail(bookingID string) (*dto.BookingDetailByHosterResponse, error)
+	UpdateBookingStatus(bookingID, newStatus string) error
+	GetBookingStatus(bookingID string) (string, error)
 }
 
 /*
@@ -57,16 +60,15 @@ func (r *hosterBookingRepository) GetListBookings(hosterID string) ([]dto.Bookin
 	query := `
 		SELECT
 			b.id AS booking_id,
+			COALESCE(NULLIF(bc.name, ''), c.full_name, '') AS customer_name,
+			COALESCE(items.item_name, '') AS item_name,
 			b.start_date::timestamptz AS start_date,
 			b.end_date::timestamptz AS end_date,
 			b.total,
-			b.status,
-			COALESCE(items.item_name, '') AS item_name,
-			COALESCE(items.total_item, 0) AS total_item,
-			COALESCE(NULLIF(bc.name, ''), c.full_name, '') AS customer_name
+			b.status
 		FROM booking b
 		LEFT JOIN (
-			SELECT booking_id, string_agg(name, ', ' ORDER BY name) AS item_name, SUM(quantity) AS total_item
+			SELECT booking_id, string_agg(name, ', ' ORDER BY name) AS item_name
 			FROM booking_item
 			GROUP BY booking_id
 		) items ON items.booking_id = b.id
@@ -156,24 +158,56 @@ func (r *hosterBookingRepository) GetBookingDetail(bookingID string) (*dto.Booki
 		return nil, err
 	}
 
-	// Hitung sisa waktu locked (jika masih aktif)
+	// Hitung sisa waktu locked (hanya untuk status pending)
 	now := time.Now()
-	if !b.LockedUntil.IsZero() && b.LockedUntil.After(now) {
+	if b.Status == "pending" && !b.LockedUntil.IsZero() && b.LockedUntil.After(now) {
 		b.TimeRemainingMinutes = int(b.LockedUntil.Sub(now).Minutes())
 	} else {
 		b.TimeRemainingMinutes = 0
+		// Clear locked_until jika bukan pending
+		if b.Status != "pending" {
+			b.LockedUntil = time.Time{}
+		}
 	}
 
 	// Ambil items
-	var items []dto.BookingItemResponse
 	queryItems := `
-		SELECT id, booking_id, item_id, name, quantity,
-			   price_per_day, deposit_per_unit, subtotal_rental, subtotal_deposit
-		FROM booking_item
-		WHERE booking_id = $1
+		SELECT 
+			bi.id, bi.booking_id, bi.item_id, bi.name, bi.quantity,
+			bi.price_per_day, bi.deposit_per_unit, bi.subtotal_rental, bi.subtotal_deposit,
+			COALESCE(i.description, '') AS description,
+			CASE 
+				WHEN i.photos IS NOT NULL THEN 
+					ARRAY(SELECT jsonb_array_elements_text(i.photos))
+				ELSE ARRAY[]::text[]
+			END AS photos
+		FROM booking_item bi
+		LEFT JOIN item i ON bi.item_id = i.id
+		WHERE bi.booking_id = $1
 	`
-	if err := r.db.Select(&items, queryItems, bookingID); err != nil {
+	rows, err := r.db.Query(queryItems, bookingID)
+	if err != nil {
 		log.Printf("GetBookingDetail(hoster): error getting items for %s: %v", bookingID, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []dto.BookingItemResponse
+	for rows.Next() {
+		var item dto.BookingItemResponse
+		err := rows.Scan(
+			&item.ID, &item.BookingID, &item.ItemID, &item.Name, &item.Quantity,
+			&item.PricePerDay, &item.DepositPerUnit, &item.SubtotalRental, &item.SubtotalDeposit,
+			&item.Description, pq.Array(&item.Photos),
+		)
+		if err != nil {
+			log.Printf("GetBookingDetail(hoster): error scanning item: %v", err)
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	if err = rows.Err(); err != nil {
+		log.Printf("GetBookingDetail(hoster): error iterating items: %v", err)
 		return nil, err
 	}
 
@@ -187,7 +221,7 @@ func (r *hosterBookingRepository) GetBookingDetail(bookingID string) (*dto.Booki
 		WHERE booking_id = $1
 		LIMIT 1
 	`
-	err := r.db.Get(&cust, queryCustPrimary, bookingID)
+	err = r.db.Get(&cust, queryCustPrimary, bookingID)
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("GetBookingDetail(hoster): error getting booking_customer for %s: %v", bookingID, err)
 		return nil, err
@@ -196,7 +230,7 @@ func (r *hosterBookingRepository) GetBookingDetail(bookingID string) (*dto.Booki
 		// try to attach identity/KTP data as enrichment
 		var identity domain.Identity
 		if idErr := r.db.Get(&identity, `
-			SELECT id, user_id, ktp_url, verified, status, COALESCE(reason,'') AS reason, created_at, updated_at
+			SELECT id, user_id, ktp_url, verified, status, COALESCE(reason,'') AS reason, verified_at, created_at, updated_at
 			FROM identity WHERE user_id = $1 ORDER BY verified_at DESC NULLS LAST, created_at DESC LIMIT 1
 		`, b.UserID); idErr == nil && identity.ID != "" {
 			cust.KTPID = identity.ID
@@ -206,6 +240,9 @@ func (r *hosterBookingRepository) GetBookingDetail(bookingID string) (*dto.Booki
 			if !identity.CreatedAt.IsZero() {
 				t := identity.CreatedAt
 				cust.UploadedAt = &t
+			}
+			if identity.VerifiedAt != nil && !identity.VerifiedAt.IsZero() {
+				cust.VerifiedAt = identity.VerifiedAt
 			}
 		}
 	}
@@ -230,7 +267,7 @@ func (r *hosterBookingRepository) GetBookingDetail(bookingID string) (*dto.Booki
 		// Tambahkan data KTP dari identity jika ada
 		var identity domain.Identity
 		if err := r.db.Get(&identity, `
-			SELECT id, user_id, ktp_url, status, COALESCE(reason,'') AS reason, created_at
+			SELECT id, user_id, ktp_url, status, COALESCE(reason,'') AS reason, verified_at, created_at
 			FROM identity WHERE user_id = $1
 			ORDER BY verified_at DESC NULLS LAST, created_at DESC LIMIT 1
 		`, b.UserID); err == nil && identity.ID != "" {
@@ -242,16 +279,24 @@ func (r *hosterBookingRepository) GetBookingDetail(bookingID string) (*dto.Booki
 				t := identity.CreatedAt
 				cust.UploadedAt = &t
 			}
+			if identity.VerifiedAt != nil && !identity.VerifiedAt.IsZero() {
+				cust.VerifiedAt = identity.VerifiedAt
+			}
 		}
 	}
 
 	// Mapping final ke DTO
+	var lockedUntilPtr *time.Time
+	if b.Status == "pending" && !b.LockedUntil.IsZero() {
+		lockedUntilPtr = &b.LockedUntil
+	}
+
 	detail := &dto.BookingDetailByHosterResponse{
 		Booking: dto.BookingInfoResponse{
 			ID:                   b.ID,
 			HosterID:             b.HosterID,
 			UserID:               b.UserID,
-			IdentityID:           b.IdentityID,
+			KTPID:                b.IdentityID,
 			StartDate:            b.StartDate,
 			EndDate:              b.EndDate,
 			TotalDays:            b.TotalDays,
@@ -262,7 +307,7 @@ func (r *hosterBookingRepository) GetBookingDetail(bookingID string) (*dto.Booki
 			Total:                b.Total,
 			Outstanding:          b.Outstanding,
 			Status:               b.Status,
-			LockedUntil:          &b.LockedUntil,
+			LockedUntil:          lockedUntilPtr,
 			TimeRemainingMinutes: b.TimeRemainingMinutes,
 			CreatedAt:            b.CreatedAt,
 			UpdatedAt:            b.UpdatedAt,
@@ -283,4 +328,78 @@ func (r *hosterBookingRepository) GetBookingDetail(bookingID string) (*dto.Booki
 
 	log.Printf("GetBookingDetail(hoster): success booking=%s", bookingID)
 	return detail, nil
+}
+
+/*
+GetBookingStatus mengambil status booking saat ini.
+
+Parameter:
+- bookingID: UUID booking yang ingin dicek
+
+Output:
+- (string, nil) - Status booking (pending, on_progress, on_rent, completed)
+- ("", error) - Error jika booking tidak ditemukan atau query gagal
+*/
+func (r *hosterBookingRepository) GetBookingStatus(bookingID string) (string, error) {
+	query := `SELECT status FROM booking WHERE id = $1`
+
+	var status string
+	err := r.db.QueryRow(query, bookingID).Scan(&status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("GetBookingStatus: booking not found: %s", bookingID)
+			return "", err
+		}
+		log.Printf("GetBookingStatus: query error: %v", err)
+		return "", err
+	}
+
+	return status, nil
+}
+
+/*
+UpdateBookingStatus mengupdate status booking.
+
+Parameter:
+- bookingID: UUID booking yang akan diupdate
+- newStatus: Status baru (on_progress, on_rent, completed)
+
+Output:
+- nil - Sukses update
+- error - Gagal update (booking not found atau query error)
+
+Note: Validasi business logic (apakah transisi valid) dilakukan di service layer.
+Jika status berubah dari pending ke on_progress, locked_until akan di-clear (set NULL).
+*/
+func (r *hosterBookingRepository) UpdateBookingStatus(bookingID, newStatus string) error {
+	query := `
+		UPDATE booking 
+		SET status = $1, 
+		    updated_at = NOW(),
+		    locked_until = CASE 
+		        WHEN $2 = 'on_progress' THEN NULL::TIMESTAMP 
+		        ELSE locked_until 
+		    END
+		WHERE id = $3
+	`
+
+	result, err := r.db.Exec(query, newStatus, newStatus, bookingID)
+	if err != nil {
+		log.Printf("UpdateBookingStatus: exec error: %v", err)
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("UpdateBookingStatus: rows affected error: %v", err)
+		return err
+	}
+
+	if rowsAffected == 0 {
+		log.Printf("UpdateBookingStatus: booking not found: %s", bookingID)
+		return sql.ErrNoRows
+	}
+
+	log.Printf("UpdateBookingStatus: success booking=%s new_status=%s", bookingID, newStatus)
+	return nil
 }

@@ -18,6 +18,7 @@ Digunakan untuk dashboard item yang dimiliki hoster.
 */
 type HosterItemRepository interface {
 	GetListItem(hosterID string) ([]dto.ItemListByHosterResponse, error)
+	GetItemDetail(hosterID, itemID string) (*dto.ItemDetailByHosterResponse, error)
 	CreateItem(item *domain.Item) (*dto.ItemDetailByHosterResponse, error)
 	DeleteItem(hosterID, itemID string) error
 	GetItemPhotos(itemID string) ([]string, error) // Return array URL photos
@@ -74,6 +75,93 @@ func (r *hosterItemRepository) GetListItem(hosterID string) ([]dto.ItemListByHos
 	}
 
 	return items, nil
+}
+
+/*
+GetItemDetail mengambil detail lengkap item berdasarkan ID.
+
+Alur kerja:
+1. Query item dengan filter id dan hoster_id (untuk memastikan ownership)
+2. Unmarshal photos dari JSONB
+3. Map ke DTO response
+
+Output sukses:
+- (*dto.ItemDetailByHosterResponse, nil)
+Output error:
+- (nil, error) → item tidak ditemukan atau bukan milik hoster
+*/
+func (r *hosterItemRepository) GetItemDetail(hosterID, itemID string) (*dto.ItemDetailByHosterResponse, error) {
+	var (
+		detail dto.ItemDetailByHosterResponse
+		row    struct {
+			ID          string          `db:"id"`
+			Name        string          `db:"name"`
+			Description sql.NullString  `db:"description"`
+			Photos      json.RawMessage `db:"photos"`
+			Stock       int             `db:"stock"`
+			PickupType  string          `db:"pickup_type"`
+			PricePerDay int             `db:"price_per_day"`
+			Deposit     int             `db:"deposit"`
+			Discount    sql.NullInt64   `db:"discount"`
+			CreatedAt   sql.NullTime    `db:"created_at"`
+			UpdatedAt   sql.NullTime    `db:"updated_at"`
+			CategoryID  string          `db:"category_id"`
+			HosterID    string          `db:"hoster_id"`
+		}
+	)
+
+	query := `
+		SELECT id, name, description, photos, stock, pickup_type,
+		       price_per_day, deposit, discount, created_at, updated_at, category_id, hoster_id
+		FROM item 
+		WHERE id = $1 AND hoster_id = $2
+	`
+
+	err := r.db.Get(&row, query, itemID, hosterID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("GetItemDetail: item %s not found for hoster %s", itemID, hosterID)
+		} else {
+			log.Printf("GetItemDetail: database error for item %s hoster %s: %v", itemID, hosterID, err)
+		}
+		return nil, err
+	}
+
+	// Convert nullable fields
+	if row.Description.Valid {
+		detail.Description = row.Description.String
+	}
+	if row.Discount.Valid {
+		detail.Discount = int(row.Discount.Int64)
+	}
+	if row.CreatedAt.Valid {
+		detail.CreatedAt = row.CreatedAt.Time
+	}
+	if row.UpdatedAt.Valid {
+		detail.UpdatedAt = row.UpdatedAt.Time
+	}
+
+	// Unmarshal photos
+	if len(row.Photos) > 0 {
+		var photos []string
+		if err = json.Unmarshal(row.Photos, &photos); err != nil {
+			log.Printf("GetItemDetail: failed to unmarshal photos for item %s: %v", itemID, err)
+			return nil, err
+		}
+		detail.Photos = photos
+	}
+
+	// Map remaining fields
+	detail.ID = row.ID
+	detail.Name = row.Name
+	detail.Stock = row.Stock
+	detail.PickupType = dto.PickupMethod(row.PickupType)
+	detail.PricePerDay = row.PricePerDay
+	detail.Deposit = row.Deposit
+	detail.CategoryID = row.CategoryID
+	detail.HosterID = row.HosterID
+
+	return &detail, nil
 }
 
 /*
