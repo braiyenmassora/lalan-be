@@ -370,7 +370,7 @@ Output:
 - error - Gagal update (booking not found atau query error)
 
 Note: Validasi business logic (apakah transisi valid) dilakukan di service layer.
-Jika status berubah dari pending ke on_progress, locked_until akan di-clear (set NULL).
+Jika status berubah dari pending ke on_progress, locked_until akan di-set ke NOW() (expired).
 */
 func (r *hosterBookingRepository) UpdateBookingStatus(bookingID, newStatus string) error {
 	query := `
@@ -378,7 +378,7 @@ func (r *hosterBookingRepository) UpdateBookingStatus(bookingID, newStatus strin
 		SET status = $1, 
 		    updated_at = NOW(),
 		    locked_until = CASE 
-		        WHEN $2 = 'on_progress' THEN NULL::TIMESTAMP 
+		        WHEN $2 = 'on_progress' THEN NOW() 
 		        ELSE locked_until 
 		    END
 		WHERE id = $3
