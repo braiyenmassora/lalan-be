@@ -57,4 +57,5 @@ type UpdateItemRequestRequest struct {
 	PickupType *PickupMethod `json:"pickup_type,omitempty"` // Gunakan PickupMethod untuk type-safe
 	Deposit    *int          `json:"deposit,omitempty"`
 	Discount   *int          `json:"discount,omitempty"`
+	CategoryID *string       `json:"category_id,omitempty"` // FK ke Category
 }
