@@ -23,6 +23,7 @@ type HosterItemRepository interface {
 	DeleteItem(hosterID, itemID string) error
 	GetItemPhotos(itemID string) ([]string, error) // Return array URL photos
 	UpdateItem(hosterID, itemID string, req *dto.UpdateItemRequestRequest) error
+	GetCategory() ([]dto.CategoryResponse, error) // Get all categories for dropdown
 }
 
 /*
@@ -429,6 +430,11 @@ func (r *hosterItemRepository) UpdateItem(hosterID, itemID string, req *dto.Upda
 		args = append(args, *req.Discount)
 		argIndex++
 	}
+	if req.CategoryID != nil {
+		setParts = append(setParts, fmt.Sprintf("category_id = $%d", argIndex))
+		args = append(args, *req.CategoryID)
+		argIndex++
+	}
 
 	if len(setParts) == 0 {
 		return fmt.Errorf("no fields to update")
@@ -451,4 +457,28 @@ func (r *hosterItemRepository) UpdateItem(hosterID, itemID string, req *dto.Upda
 
 	log.Printf("UpdateItem: successfully updated item %s for hoster %s", itemID, hosterID)
 	return nil
+}
+
+/*
+GetCategory mengambil semua kategori yang aktif untuk dropdown saat create/update item.
+
+Output:
+- ([]dto.CategoryResponse, nil) - List semua kategori
+- (nil, error) - Query gagal
+*/
+func (r *hosterItemRepository) GetCategory() ([]dto.CategoryResponse, error) {
+	query := `
+		SELECT id, name, description
+		FROM category
+		ORDER BY name ASC
+	`
+
+	var categories []dto.CategoryResponse
+	if err := r.db.Select(&categories, query); err != nil {
+		log.Printf("GetCategory: db error err=%v", err)
+		return nil, err
+	}
+
+	log.Printf("GetCategory: found %d categories", len(categories))
+	return categories, nil
 }

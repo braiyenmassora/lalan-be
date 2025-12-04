@@ -21,6 +21,9 @@ const (
 
 	// PickupMethodDelivery: Hoster kirim ke alamat customer
 	PickupMethodDelivery PickupMethod = "delivery"
+
+	// PickupMethodBoth: Hoster bisa antar ATAU customer bisa ambil sendiri (customer bebas pilih)
+	PickupMethodBoth PickupMethod = "both"
 )
 
 // ===================================================================
@@ -32,7 +35,7 @@ const (
 //
 // Field penting:
 // - Stock: Jumlah unit yang tersedia. Jika 0, item tidak bisa di-booking
-// - PickupType: Metode pengambilan (pickup/delivery)
+// - PickupType: Metode pengambilan - "self_pickup" (hanya ambil sendiri), "delivery" (hanya antar), "both" (customer bebas pilih)
 // - PricePerDay: Harga sewa per hari per unit
 // - Deposit: Uang jaminan per unit (dikembalikan jika item tidak rusak)
 // - Discount: Diskon dalam nominal (opsional)

@@ -37,7 +37,7 @@ type Booking struct {
 	StartDate            time.Time `json:"start_date" db:"start_date"`       // Tanggal mulai sewa
 	EndDate              time.Time `json:"end_date" db:"end_date"`           // Tanggal selesai sewa
 	TotalDays            int       `json:"total_days" db:"total_days"`       // Durasi sewa dalam hari
-	DeliveryType         string    `json:"delivery_type" db:"delivery_type"` // "pickup" atau "delivery"
+	DeliveryType         string    `json:"delivery_type" db:"delivery_type"` // "self_pickup" (ambil sendiri) atau "delivery" (antar ke alamat)
 	Rental               int       `json:"rental" db:"rental"`               // Total biaya sewa (sum dari semua item)
 	Deposit              int       `json:"deposit" db:"deposit"`             // Total deposit (sum dari semua item)
 	Discount             int       `json:"discount" db:"discount"`           // Diskon (jika ada)

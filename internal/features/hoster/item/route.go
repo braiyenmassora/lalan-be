@@ -32,6 +32,7 @@ func SetupItemRoutes(router *mux.Router, h *HosterItemHandler) {
 	// Route normal (use singular "item")
 	protected.HandleFunc("/item", h.GetListItem).Methods("GET", "OPTIONS")
 	protected.HandleFunc("/item", h.CreateItem).Methods("POST", "OPTIONS")
+	protected.HandleFunc("/item/category", h.GetCategory).Methods("GET", "OPTIONS") // Dropdown categories
 	protected.HandleFunc("/item/{id}", h.GetItemDetail).Methods("GET", "OPTIONS")
 	protected.HandleFunc("/item/{id}", h.UpdateItem).Methods("PUT", "OPTIONS")
 	protected.HandleFunc("/item/{id}", h.DeleteItem).Methods("DELETE", "OPTIONS")

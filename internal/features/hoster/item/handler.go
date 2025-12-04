@@ -340,3 +340,32 @@ func (h *HosterItemHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 
 	response.OK(w, nil, message.ItemUpdated) // Asumsi ada message.ItemUpdated
 }
+
+/*
+GetCategory menangani GET /api/v1/hoster/item/categories
+
+Alur kerja:
+1. Validasi method GET
+2. Panggil service untuk ambil semua kategori
+3. Return list kategori untuk dropdown
+
+Output sukses:
+- 200 OK + list kategori
+Output error:
+- 500 Internal Server Error
+*/
+func (h *HosterItemHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		response.Error(w, http.StatusMethodNotAllowed, message.MethodNotAllowed)
+		return
+	}
+
+	categories, err := h.service.GetCategory()
+	if err != nil {
+		log.Printf("GetCategory(handler): service error err=%v", err)
+		response.Error(w, http.StatusInternalServerError, message.InternalError)
+		return
+	}
+
+	response.OK(w, categories, message.Success)
+}

@@ -25,7 +25,8 @@ type ItemService interface {
 	GetItemDetail(hosterID, itemID string) (*dto.ItemDetailByHosterResponse, error)
 	CreateItem(ctx context.Context, item *domain.Item, photoFiles []*multipart.FileHeader) (*dto.ItemDetailByHosterResponse, error)
 	DeleteItem(hosterID, itemID string) error
-	UpdateItem(hosterID, itemID string, req *dto.UpdateItemRequestRequest) error // Tambah ini
+	UpdateItem(hosterID, itemID string, req *dto.UpdateItemRequestRequest) error
+	GetCategory() ([]dto.CategoryResponse, error) // Get categories for dropdown
 }
 
 /*
@@ -137,9 +138,9 @@ func (s *itemService) CreateItem(ctx context.Context, item *domain.Item, photoFi
 		return nil, errors.New(message.BadRequest)
 	}
 	// Ubah validasi pickup_type
-	log.Printf("CreateItem: item.PickupType='%s', expected self='%s' delivery='%s'", item.PickupType, domain.PickupMethodSelfPickup, domain.PickupMethodDelivery)
+	log.Printf("CreateItem: item.PickupType='%s', expected self='%s' delivery='%s' both='%s'", item.PickupType, domain.PickupMethodSelfPickup, domain.PickupMethodDelivery, domain.PickupMethodBoth)
 
-	if !(item.PickupType == domain.PickupMethodSelfPickup || item.PickupType == domain.PickupMethodDelivery) {
+	if !(item.PickupType == domain.PickupMethodSelfPickup || item.PickupType == domain.PickupMethodDelivery || item.PickupType == domain.PickupMethodBoth) {
 		log.Printf("CreateItem: invalid pickup_type")
 		return nil, errors.New(message.BadRequest)
 	}
@@ -239,7 +240,7 @@ func (s *itemService) UpdateItem(hosterID, itemID string, req *dto.UpdateItemReq
 	if req.Stock != nil && *req.Stock < 0 {
 		return errors.New(message.BadRequest)
 	}
-	if req.PickupType != nil && !(*req.PickupType == "self_pickup" || *req.PickupType == "delivery") {
+	if req.PickupType != nil && !(*req.PickupType == "self_pickup" || *req.PickupType == "delivery" || *req.PickupType == "both") {
 		return errors.New(message.BadRequest)
 	}
 	if req.Deposit != nil && *req.Deposit < 0 {
@@ -259,4 +260,15 @@ func (s *itemService) UpdateItem(hosterID, itemID string, req *dto.UpdateItemReq
 	}
 
 	return nil
+}
+
+/*
+GetCategory mengambil list semua kategori untuk dropdown di form create/update item.
+
+Output:
+- ([]dto.CategoryResponse, nil) - List kategori
+- (nil, error) - Error dari repository
+*/
+func (s *itemService) GetCategory() ([]dto.CategoryResponse, error) {
+	return s.repo.GetCategory()
 }

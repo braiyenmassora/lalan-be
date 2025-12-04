@@ -21,7 +21,7 @@ import "time"
 //	{
 //	  "start_date": "2025-12-20",
 //	  "end_date": "2025-12-25",
-//	  "delivery_type": "pickup",
+//	  "delivery_type": "self_pickup",
 //	  "items": [
 //	    {
 //	      "item_id": "uuid-item-123",
@@ -46,7 +46,7 @@ import "time"
 type CreateBookingByCustomerRequest struct {
 	StartDate    string                                 `json:"start_date"`    // Format: YYYY-MM-DD
 	EndDate      string                                 `json:"end_date"`      // Format: YYYY-MM-DD
-	DeliveryType string                                 `json:"delivery_type"` // "pickup" atau "delivery"
+	DeliveryType string                                 `json:"delivery_type"` // "self_pickup" (customer ambil sendiri) atau "delivery" (diantar ke alamat)
 	Items        []CreateBookingItemByCustomerRequest   `json:"items"`
 	Customer     CreateBookingCustomerByCustomerRequest `json:"customer"`
 	Delivery     int                                    `json:"delivery"`
