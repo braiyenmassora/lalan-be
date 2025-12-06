@@ -369,3 +369,61 @@ func (h *HosterItemHandler) GetCategory(w http.ResponseWriter, r *http.Request) 
 
 	response.OK(w, categories, message.Success)
 }
+
+/*
+UpdateVisibility menangani PATCH /api/v1/hoster/item/{id}/visibility
+
+Alur kerja:
+1. Validasi method PATCH
+2. Ambil hosterID dari JWT context
+3. Ambil itemID dari path parameter
+4. Parse request body (is_hidden)
+5. Panggil service.ToggleVisibility
+6. Return response
+
+Output sukses:
+- 200 OK
+Output error:
+- 400 Bad Request / 401 Unauthorized / 500 Internal Server Error
+*/
+func (h *HosterItemHandler) UpdateVisibility(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		response.MethodNotAllowed(w, message.MethodNotAllowed)
+		return
+	}
+
+	hosterID := middleware.GetUserID(r)
+	if hosterID == "" {
+		response.Unauthorized(w, message.Unauthorized)
+		return
+	}
+
+	vars := mux.Vars(r)
+	itemID := vars["id"]
+	if itemID == "" {
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+
+	var req dto.UpdateVisibilityRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("UpdateVisibility: failed to parse request body: %v", err)
+		response.BadRequest(w, message.BadRequest)
+		return
+	}
+
+	if err := h.service.ToggleVisibility(hosterID, itemID, req.IsHidden); err != nil {
+		log.Printf("UpdateVisibility handler: service error hoster=%s item=%s err=%v", hosterID, itemID, err)
+		switch err.Error() {
+		case message.Unauthorized:
+			response.Unauthorized(w, message.Unauthorized)
+		case message.BadRequest:
+			response.BadRequest(w, message.BadRequest)
+		default:
+			response.Error(w, http.StatusInternalServerError, message.InternalError)
+		}
+		return
+	}
+
+	response.OK(w, nil, message.ItemVisibilityUpdated)
+}

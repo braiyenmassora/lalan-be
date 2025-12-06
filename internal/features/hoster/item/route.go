@@ -36,6 +36,7 @@ func SetupItemRoutes(router *mux.Router, h *HosterItemHandler) {
 	protected.HandleFunc("/item/{id}", h.GetItemDetail).Methods("GET", "OPTIONS")
 	protected.HandleFunc("/item/{id}", h.UpdateItem).Methods("PUT", "OPTIONS")
 	protected.HandleFunc("/item/{id}", h.DeleteItem).Methods("DELETE", "OPTIONS")
+	protected.HandleFunc("/item/visibility/{id}", h.UpdateVisibility).Methods("PATCH", "OPTIONS") // Toggle visibility
 
 	// Opsional: handler khusus OPTIONS biar return 204 (lebih bersih)
 	protected.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -22,6 +22,7 @@ type ItemListByHosterResponse struct {
 	Stock       int          `json:"stock" db:"stock"`
 	PricePerDay int          `json:"price_per_day" db:"price_per_day"`
 	PickupType  PickupMethod `json:"pickup_type" db:"pickup_type"`
+	IsHidden    bool         `json:"is_hidden" db:"is_hidden"`
 }
 
 type ItemDetailByHosterResponse struct {
@@ -38,6 +39,7 @@ type ItemDetailByHosterResponse struct {
 	UpdatedAt   time.Time    `json:"updated_at" db:"updated_at"`
 	CategoryID  string       `json:"category_id" db:"category_id"` // FK ke Category
 	HosterID    string       `json:"hoster_id" db:"hoster_id"`     // FK ke Hoster
+	IsHidden    bool         `json:"is_hidden" db:"is_hidden"`     // Item hidden dari customer
 }
 
 type CreateItemByCustomerRequest struct {
@@ -53,9 +55,15 @@ type CreateItemByCustomerRequest struct {
 }
 
 type UpdateItemRequestRequest struct {
-	Stock      *int          `json:"stock,omitempty"`       // Pointer untuk opsional
-	PickupType *PickupMethod `json:"pickup_type,omitempty"` // Gunakan PickupMethod untuk type-safe
-	Deposit    *int          `json:"deposit,omitempty"`
-	Discount   *int          `json:"discount,omitempty"`
-	CategoryID *string       `json:"category_id,omitempty"` // FK ke Category
+	Stock       *int          `json:"stock,omitempty"`       // Pointer untuk opsional
+	PickupType  *PickupMethod `json:"pickup_type,omitempty"` // Gunakan PickupMethod untuk type-safe
+	Deposit     *int          `json:"deposit,omitempty"`
+	Discount    *int          `json:"discount,omitempty"`
+	CategoryID  *string       `json:"category_id,omitempty"`   // FK ke Category
+	PricePerDay *int          `json:"price_per_day,omitempty"` // Harga sewa per hari (optional)
+	Description *string       `json:"description,omitempty"`   // Deskripsi item (optional)
+}
+
+type UpdateVisibilityRequest struct {
+	IsHidden bool `json:"is_hidden"` // true = sembunyikan, false = tampilkan
 }
