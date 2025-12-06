@@ -76,6 +76,8 @@ func (r *publicRepository) GetAllItems() ([]*domain.Item, error) {
 			price_per_day, deposit, discount, category_id, hoster_id,
 			created_at, updated_at
 		FROM item
+		WHERE is_hidden = false
+		ORDER BY created_at DESC
 	`
 
 	var items []*domain.Item
@@ -207,7 +209,7 @@ func (r *publicRepository) GetItemDetail(itemID string) (*dto.ItemDetailResponse
 		INNER JOIN category c ON c.id = i.category_id
 		INNER JOIN hoster h ON h.id = i.hoster_id
 		LEFT JOIN tnc t ON t.hoster_id = h.id
-		WHERE i.id = $1
+		WHERE i.id = $1 AND i.is_hidden = false
 	`
 
 	var (

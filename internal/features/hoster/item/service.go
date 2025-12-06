@@ -26,7 +26,8 @@ type ItemService interface {
 	CreateItem(ctx context.Context, item *domain.Item, photoFiles []*multipart.FileHeader) (*dto.ItemDetailByHosterResponse, error)
 	DeleteItem(hosterID, itemID string) error
 	UpdateItem(hosterID, itemID string, req *dto.UpdateItemRequestRequest) error
-	GetCategory() ([]dto.CategoryResponse, error) // Get categories for dropdown
+	GetCategory() ([]dto.CategoryResponse, error)                  // Get categories for dropdown
+	ToggleVisibility(hosterID, itemID string, isHidden bool) error // Toggle item visibility
 }
 
 /*
@@ -191,6 +192,17 @@ func (s *itemService) DeleteItem(hosterID, itemID string) error {
 		return errors.New(message.BadRequest)
 	}
 
+	// Validasi: Cek apakah item punya booking aktif
+	hasBookings, err := s.repo.HasActiveBookings(itemID)
+	if err != nil {
+		log.Printf("DeleteItem: failed to check bookings for item %s: %v", itemID, err)
+		return errors.New(message.InternalError)
+	}
+	if hasBookings {
+		log.Printf("DeleteItem: item %s has active bookings, cannot delete", itemID)
+		return errors.New(message.ItemHasActiveBookings)
+	}
+
 	// Ambil photos sebelum delete
 	photos, err := s.repo.GetItemPhotos(itemID)
 	if err != nil {
@@ -249,6 +261,9 @@ func (s *itemService) UpdateItem(hosterID, itemID string, req *dto.UpdateItemReq
 	if req.Discount != nil && *req.Discount < 0 {
 		return errors.New(message.BadRequest)
 	}
+	if req.PricePerDay != nil && *req.PricePerDay <= 0 {
+		return errors.New(message.BadRequest)
+	}
 
 	// Panggil repo.UpdateItem
 	if err := s.repo.UpdateItem(hosterID, itemID, req); err != nil {
@@ -271,4 +286,36 @@ Output:
 */
 func (s *itemService) GetCategory() ([]dto.CategoryResponse, error) {
 	return s.repo.GetCategory()
+}
+
+/*
+ToggleVisibility mengubah status visibility item (is_hidden).
+Tidak ada validasi booking - hoster bisa hide/show kapan saja.
+
+Validasi:
+  - hosterID tidak kosong -> Unauthorized
+  - itemID tidak kosong -> BadRequest
+
+Business:
+  - Panggil repo.UpdateVisibility
+*/
+func (s *itemService) ToggleVisibility(hosterID, itemID string, isHidden bool) error {
+	if hosterID == "" {
+		return errors.New(message.Unauthorized)
+	}
+	if itemID == "" {
+		return errors.New(message.BadRequest)
+	}
+
+	// Tidak ada validasi booking - selalu bisa hide/show
+	if err := s.repo.UpdateVisibility(hosterID, itemID, isHidden); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New(message.BadRequest)
+		}
+		log.Printf("ToggleVisibility(service): repo error hoster=%s item=%s err=%v", hosterID, itemID, err)
+		return errors.New(message.InternalError)
+	}
+
+	log.Printf("ToggleVisibility: item %s is_hidden=%v by hoster %s", itemID, isHidden, hosterID)
+	return nil
 }

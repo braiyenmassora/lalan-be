@@ -22,11 +22,13 @@ const (
 	UploadFailed  = "failed to upload %s"
 
 	// ITEM
-	ItemCreated   = "item created"
-	ItemUpdated   = "item updated"
-	ItemDeleted   = "item deleted"
-	ItemNotFound  = "item not found"
-	ItemRetrieved = "item retrieved successfully"
+	ItemCreated           = "item created"
+	ItemUpdated           = "item updated"
+	ItemDeleted           = "item deleted"
+	ItemNotFound          = "item not found"
+	ItemRetrieved         = "item retrieved successfully"
+	ItemHasActiveBookings = "item masih terikat dengan pesanan aktif dan tidak dapat dihapus"
+	ItemVisibilityUpdated = "item visibility updated successfully"
 
 	// Authentication & Authorization
 	LoginFailed            = "invalid email or password"

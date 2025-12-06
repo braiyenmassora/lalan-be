@@ -23,7 +23,9 @@ type HosterItemRepository interface {
 	DeleteItem(hosterID, itemID string) error
 	GetItemPhotos(itemID string) ([]string, error) // Return array URL photos
 	UpdateItem(hosterID, itemID string, req *dto.UpdateItemRequestRequest) error
-	GetCategory() ([]dto.CategoryResponse, error) // Get all categories for dropdown
+	GetCategory() ([]dto.CategoryResponse, error)                  // Get all categories for dropdown
+	HasActiveBookings(itemID string) (bool, error)                 // Cek apakah item punya booking aktif
+	UpdateVisibility(hosterID, itemID string, isHidden bool) error // Toggle visibility item
 }
 
 /*
@@ -62,10 +64,11 @@ func (r *hosterItemRepository) GetListItem(hosterID string) ([]dto.ItemListByHos
             name,
             stock,
             price_per_day,
-            pickup_type
+            pickup_type,
+            is_hidden
         FROM item
         WHERE hoster_id = $1
-        ORDER BY name ASC
+        ORDER BY created_at DESC
     `
 
 	var items []dto.ItemListByHosterResponse
@@ -108,12 +111,13 @@ func (r *hosterItemRepository) GetItemDetail(hosterID, itemID string) (*dto.Item
 			UpdatedAt   sql.NullTime    `db:"updated_at"`
 			CategoryID  string          `db:"category_id"`
 			HosterID    string          `db:"hoster_id"`
+			IsHidden    bool            `db:"is_hidden"`
 		}
 	)
 
 	query := `
 		SELECT id, name, description, photos, stock, pickup_type,
-		       price_per_day, deposit, discount, created_at, updated_at, category_id, hoster_id
+		       price_per_day, deposit, discount, created_at, updated_at, category_id, hoster_id, is_hidden
 		FROM item 
 		WHERE id = $1 AND hoster_id = $2
 	`
@@ -161,6 +165,7 @@ func (r *hosterItemRepository) GetItemDetail(hosterID, itemID string) (*dto.Item
 	detail.Deposit = row.Deposit
 	detail.CategoryID = row.CategoryID
 	detail.HosterID = row.HosterID
+	detail.IsHidden = row.IsHidden
 
 	return &detail, nil
 }
@@ -435,6 +440,16 @@ func (r *hosterItemRepository) UpdateItem(hosterID, itemID string, req *dto.Upda
 		args = append(args, *req.CategoryID)
 		argIndex++
 	}
+	if req.PricePerDay != nil {
+		setParts = append(setParts, fmt.Sprintf("price_per_day = $%d", argIndex))
+		args = append(args, *req.PricePerDay)
+		argIndex++
+	}
+	if req.Description != nil {
+		setParts = append(setParts, fmt.Sprintf("description = $%d", argIndex))
+		args = append(args, *req.Description)
+		argIndex++
+	}
 
 	if len(setParts) == 0 {
 		return fmt.Errorf("no fields to update")
@@ -481,4 +496,87 @@ func (r *hosterItemRepository) GetCategory() ([]dto.CategoryResponse, error) {
 
 	log.Printf("GetCategory: found %d categories", len(categories))
 	return categories, nil
+}
+
+/*
+HasActiveBookings memeriksa apakah item memiliki booking aktif.
+Booking aktif adalah booking dengan status: pending, on_progress, atau on_rent.
+
+Output:
+- (true, nil) - Item memiliki booking aktif
+- (false, nil) - Item tidak memiliki booking aktif
+- (false, error) - Query gagal
+*/
+func (r *hosterItemRepository) HasActiveBookings(itemID string) (bool, error) {
+	query := `
+		SELECT EXISTS(
+			SELECT 1 
+			FROM booking_item bi
+			JOIN booking b ON bi.booking_id = b.id
+			WHERE bi.item_id = $1 
+			AND b.status IN ('pending', 'on_progress', 'on_rent')
+		) AS has_bookings
+	`
+
+	var hasBookings bool
+	if err := r.db.Get(&hasBookings, query, itemID); err != nil {
+		log.Printf("HasActiveBookings: db error item=%s err=%v", itemID, err)
+		return false, err
+	}
+
+	log.Printf("HasActiveBookings: item=%s has_bookings=%v", itemID, hasBookings)
+	return hasBookings, nil
+}
+
+/*
+UpdateVisibility mengubah status visibility item (is_hidden).
+
+Alur kerja:
+1. Mulai transaction
+2. Cek ownership item
+3. Update field is_hidden
+4. Commit transaction
+
+Output:
+- nil - Sukses
+- error - Gagal (item not found atau bukan milik hoster)
+*/
+func (r *hosterItemRepository) UpdateVisibility(hosterID, itemID string, isHidden bool) error {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		log.Printf("UpdateVisibility: error starting transaction: %v", err)
+		return err
+	}
+	defer tx.Rollback()
+
+	// Cek ownership
+	var ownerID string
+	if err := tx.Get(&ownerID, `SELECT hoster_id FROM item WHERE id = $1`, itemID); err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("UpdateVisibility: item %s not found", itemID)
+			return sql.ErrNoRows
+		}
+		log.Printf("UpdateVisibility: failed to query owner for item %s: %v", itemID, err)
+		return err
+	}
+	if ownerID != hosterID {
+		log.Printf("UpdateVisibility: ownership mismatch for item %s owner=%s requester=%s", itemID, ownerID, hosterID)
+		return sql.ErrNoRows
+	}
+
+	// Update visibility
+	query := `UPDATE item SET is_hidden = $1, updated_at = NOW() WHERE id = $2 AND hoster_id = $3`
+	_, err = tx.Exec(query, isHidden, itemID, hosterID)
+	if err != nil {
+		log.Printf("UpdateVisibility: error updating item %s: %v", itemID, err)
+		return err
+	}
+
+	if err = tx.Commit(); err != nil {
+		log.Printf("UpdateVisibility: error committing transaction for item %s: %v", itemID, err)
+		return err
+	}
+
+	log.Printf("UpdateVisibility: successfully updated item %s is_hidden=%v", itemID, isHidden)
+	return nil
 }
